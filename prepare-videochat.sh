@@ -51,8 +51,8 @@ if ! type gst-launch; then
     sudo apt-get install gstreamer0.10-tools
 fi
 gst-launch -v \
-    souphttpsrc location="http://$IP:$PORT/videofeed" is_live=true \
+    souphttpsrc location="http://$IP:$PORT/videofeed" do-timestamp=true is_live=true \
     ! jpegdec ! ffmpegcolorspace ! v4l2sink device=/dev/video0 \
-    souphttpsrc location="http://$IP:$PORT/audio.wav" is_live=true \
-    ! wavparse ! pulsesink device=null
+    souphttpsrc location="http://$IP:$PORT/audio.wav" do-timestamp=true is_live=true \
+    ! wavparse ! pulsesink device=null sync=false \
     2>&1 | tee feed.log
