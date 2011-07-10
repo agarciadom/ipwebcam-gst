@@ -13,8 +13,4 @@ This project includes `prepare-videochat.sh`, which does all these things, excep
 
 To use this script, simply run it with `./prepare-videochat.sh` and follow instructions. You may have to customize a few variables in the CUSTOMIZATION section before using it, though.
 
-Disclaimer: the script has only been tested in my local installation of Ubuntu 11.04. I can't really support other distributions, sorry!
-
---
-Antonio
-Twitter: @antoniogado
+Disclaimer: the script has only been tested in my local installation of Ubuntu 11.04. I think it should work on most recent Debian-based distributions as well (and Debian, of course). If you need any help, drop me a direct message on Twitter at @antoniogado.
