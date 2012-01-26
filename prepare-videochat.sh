@@ -4,8 +4,27 @@
 # Copyright (C) 2011 Antonio García Domínguez
 # Licensed under GPLv3
 
+# Usage: ./prepare-videochat.sh [flip method]
+#
+# [flip method] is "none" by default. Here are some values you can try
+# out (from gst/videofilter/gstvideoflip.c):
+#
+# - clockwise: clockwise 90 degrees
+# - rotate-180: 180 degrees
+# - counterclockwise: counter-clockwise 90 degrees
+# - horizontal-flip: flip horizontally
+# - vertical-flip: flip vertically
+# - upper-left-diagonal: flip across upper-left/lower-right diagonal
+# - upper-right-diagonal: flip across upper-right/lower-left diagonal
+
 # Exit on first error
 set -e
+
+if [ -n "$1" ]; then
+    FLIP_METHOD=$1
+else
+    FLIP_METHOD=none
+fi
 
 ### CONFIGURATION
 
@@ -87,12 +106,19 @@ start_iw_server() {
 
 # Check if the user has v4l2loopback
 if ! has_kernel_module v4l2loopback; then
-    info "The v4l2loopback kernel module is not installed or could not be loaded. I will try to install the kernel module using DKMS. If that doesn't work, please install v4l2loopback manually from github.com/umlaeute/v4l2loopback."
-    sudo apt-get install dkms
-    wget "$V4L2LOOPBACK_DEB_URL" -O "$V4L2LOOPBACK_DEB_PATH"
-    sudo dpkg -i "$V4L2LOOPBACK_DEB_PATH"
+    info "The v4l2loopback kernel module is not installed or could not be loaded. I will try to install the kernel module using your distro's package manager. If that doesn't work, please install v4l2loopback manually from github.com/umlaeute/v4l2loopback."
+    if can_run apt-get; then
+	sudo apt-get install dkms
+	wget "$V4L2LOOPBACK_DEB_URL" -O "$V4L2LOOPBACK_DEB_PATH"
+	sudo dpkg -i "$V4L2LOOPBACK_DEB_PATH"
+    elif can_run yaourt; then
+	yaourt -S gst-v4l2loopback
+    fi
+
     if has_kernel_module v4l2loopback; then
 	info "The v4l2loopback kernel module was installed successfully."
+    else
+	error "Could not install the v4l2loopback kernel module."
     fi
 fi
 
@@ -138,17 +164,33 @@ if ! pgrep pavucontrol; then
 fi
 
 # Check for gst-launch
-if ! can_run gst-launch; then
-    info "You don't have gst-launch. I'll try to install its Debian/Ubuntu package."
-    sudo apt-get install gstreamer-tools
+GSTLAUNCH=gst-launch
+if can_run apt-get; then
+    # Debian
+    GSTLAUNCH=gst-launch
+    if ! can_run "$GSTLAUNCH"; then
+	info "You don't have gst-launch. I'll try to install its Debian/Ubuntu package."
+	sudo apt-get install gstreamer-tools	
+    fi
+elif can_run pacman; then
+    # Arch
+    GSTLAUNCH=gst-launch-0.10
+    if ! can_run "$GSTLAUNCH"; then
+	info "You don't have gst-launch. I'll try to install its Arch package."
+	sudo pacman -S gstreamer0.10 gstreamer0.10-good-plugins
+    fi
+fi
+if ! can_run "$GSTLAUNCH"; then
+    error "Could not find gst-launch. Exiting."
+    exit 1
 fi
 
 # Start the GStreamer graph needed to grab the video and audio
 set +e
 info "Using IP Webcam as webcam/microphone. You can now open your videochat app."
-gst-launch -v \
+"$GSTLAUNCH" -v \
     souphttpsrc location="http://$IP:$PORT/videofeed" do-timestamp=true is_live=true \
-    ! multipartdemux ! jpegdec ! ffmpegcolorspace ! v4l2sink device=/dev/video0 \
+    ! multipartdemux ! jpegdec ! ffmpegcolorspace ! "video/x-raw-yuv, format=(fourcc){YUY2}" ! videoflip method="$FLIP_METHOD" ! v4l2sink device=/dev/video0 \
     souphttpsrc location="http://$IP:$PORT/audio.wav" do-timestamp=true is_live=true \
     ! wavparse ! audioconvert ! volume volume=3 ! rglimiter ! pulsesink device=null sync=false \
     2>&1 | tee feed.log
