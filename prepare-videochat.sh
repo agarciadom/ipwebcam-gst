@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script for using IP Webcam as a microphone/webcam in Ubuntu 11.04
+# Script for using IP Webcam as a microphone/webcam in Ubuntu 11.04 and Arch
 # Copyright (C) 2011 Antonio García Domínguez
 # Licensed under GPLv3
 
