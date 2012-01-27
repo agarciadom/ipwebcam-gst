@@ -190,7 +190,7 @@ set +e
 info "Using IP Webcam as webcam/microphone. You can now open your videochat app."
 "$GSTLAUNCH" -v \
     souphttpsrc location="http://$IP:$PORT/videofeed" do-timestamp=true is_live=true \
-    ! multipartdemux ! jpegdec ! ffmpegcolorspace ! "video/x-raw-yuv, format=(fourcc){YUY2}" ! videoflip method="$FLIP_METHOD" ! v4l2sink device=/dev/video0 \
+    ! multipartdemux ! jpegdec ! ffmpegcolorspace ! "video/x-raw-yuv, format=(fourcc){YV12}" ! videoflip method="$FLIP_METHOD" ! v4l2sink device=/dev/video0 \
     souphttpsrc location="http://$IP:$PORT/audio.wav" do-timestamp=true is_live=true \
     ! wavparse ! audioconvert ! volume volume=3 ! rglimiter ! pulsesink device=null sync=false \
     2>&1 | tee feed.log
