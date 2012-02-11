@@ -44,7 +44,7 @@ WIFI_IP=192.168.2.122
 PORT=8080
 
 # URL on which the latest v4l2loopback DKMS .deb can be found
-V4L2LOOPBACK_DEB_URL=http://ftp.us.debian.org/debian/pool/main/v/v4l2loopback/v4l2loopback-dkms_0.4.0-1_all.deb
+V4L2LOOPBACK_DEB_URL=http://ftp.us.debian.org/debian/pool/main/v/v4l2loopback/v4l2loopback-dkms_0.5.0-1_all.deb
 
 # Path to which the v4l2loopback DKMS .deb should be saved
 V4L2LOOPBACK_DEB_PATH=/tmp/v4l2loopback-dkms.deb
