@@ -43,6 +43,10 @@ WIFI_IP=192.168.2.122
 # Port on which IP Webcam is listening
 PORT=8080
 
+# Device created by loading v4l2loopback. If you don't have any other webcam in your computer, the default will
+# be fine. Otherwise, you will have to try with /dev/video1, /dev/video2 and so on.
+DEVICE=/dev/video0
+
 # URL on which the latest v4l2loopback DKMS .deb can be found
 V4L2LOOPBACK_DEB_URL=http://ftp.us.debian.org/debian/pool/main/v/v4l2loopback/v4l2loopback-dkms_0.4.0-1_all.deb
 
@@ -113,12 +117,13 @@ if ! has_kernel_module v4l2loopback; then
 	sudo dpkg -i "$V4L2LOOPBACK_DEB_PATH"
     elif can_run yaourt; then
 	yaourt -S gst-v4l2loopback
+	yaourt -S v4l2loopback-git
     fi
 
     if has_kernel_module v4l2loopback; then
 	info "The v4l2loopback kernel module was installed successfully."
     else
-	error "Could not install the v4l2loopback kernel module."
+	error "Could not install the v4l2loopback kernel module through apt-get or yaourt."
     fi
 fi
 
@@ -190,7 +195,7 @@ set +e
 info "Using IP Webcam as webcam/microphone. You can now open your videochat app."
 "$GSTLAUNCH" -v \
     souphttpsrc location="http://$IP:$PORT/videofeed" do-timestamp=true is_live=true \
-    ! multipartdemux ! jpegdec ! ffmpegcolorspace ! "video/x-raw-yuv, format=(fourcc){YV12}" ! videoflip method="$FLIP_METHOD" ! v4l2sink device=/dev/video0 \
+    ! multipartdemux ! jpegdec ! ffmpegcolorspace ! "video/x-raw-yuv, format=(fourcc){YV12}" ! videoflip method="$FLIP_METHOD" ! v4l2sink device="$DEVICE" \
     souphttpsrc location="http://$IP:$PORT/audio.wav" do-timestamp=true is_live=true \
     ! wavparse ! audioconvert ! volume volume=3 ! rglimiter ! pulsesink device=null sync=false \
     2>&1 | tee feed.log
