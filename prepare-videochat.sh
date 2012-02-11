@@ -43,10 +43,6 @@ WIFI_IP=192.168.2.122
 # Port on which IP Webcam is listening
 PORT=8080
 
-# Device created by loading v4l2loopback. If you don't have any other webcam in your computer, the default will
-# be fine. Otherwise, you will have to try with /dev/video1, /dev/video2 and so on.
-DEVICE=/dev/video0
-
 # URL on which the latest v4l2loopback DKMS .deb can be found
 V4L2LOOPBACK_DEB_URL=http://ftp.us.debian.org/debian/pool/main/v/v4l2loopback/v4l2loopback-dkms_0.4.0-1_all.deb
 
@@ -126,6 +122,11 @@ if ! has_kernel_module v4l2loopback; then
 	error "Could not install the v4l2loopback kernel module through apt-get or yaourt."
     fi
 fi
+
+# Use the newest /dev/video* device as the webcam: this should help
+# when loading v4l2loopback on a system that already has a regular
+# webcam.
+DEVICE=$(ls -1t /dev/video* | head -1)
 
 # Decide whether to connect through USB or through wi-fi
 IP=$WIFI_IP
