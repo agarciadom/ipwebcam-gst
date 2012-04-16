@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script for using IP Webcam as a microphone/webcam in Ubuntu 11.04 and Arch
-# Copyright (C) 2011 Antonio García Domínguez
+# Copyright (C) 2011-2012 Antonio García Domínguez
 # Licensed under GPLv3
 
 # Usage: ./prepare-videochat.sh [flip method]
@@ -16,6 +16,15 @@
 # - vertical-flip: flip vertically
 # - upper-left-diagonal: flip across upper-left/lower-right diagonal
 # - upper-right-diagonal: flip across upper-right/lower-left diagonal
+#
+# However, some of these flip methods do not seem to work. In
+# particular, those which change the picture size, such as clockwise
+# or counterclockwise. *-flip and rotate-180 do work, though.
+#
+# Last tested with:
+# - souphttpsrc version 0.10.31
+# - v4l2sink version 0.10.31
+# - v4l2loopback version 0.5.0
 
 # Exit on first error
 set -e
@@ -42,6 +51,9 @@ WIFI_IP=192.168.2.122
 
 # Port on which IP Webcam is listening
 PORT=8080
+
+# GStreamer debug string (see gst-launch manpage)
+GST_DEBUG=soup*:0,videoflip:0,ffmpegcolorspace:0
 
 # URL on which the latest v4l2loopback DKMS .deb can be found
 V4L2LOOPBACK_DEB_URL=http://ftp.us.debian.org/debian/pool/main/v/v4l2loopback/v4l2loopback-dkms_0.5.0-1_all.deb
@@ -108,18 +120,18 @@ start_iw_server() {
 if ! has_kernel_module v4l2loopback; then
     info "The v4l2loopback kernel module is not installed or could not be loaded. I will try to install the kernel module using your distro's package manager. If that doesn't work, please install v4l2loopback manually from github.com/umlaeute/v4l2loopback."
     if can_run apt-get; then
-	sudo apt-get install dkms
-	wget "$V4L2LOOPBACK_DEB_URL" -O "$V4L2LOOPBACK_DEB_PATH"
-	sudo dpkg -i "$V4L2LOOPBACK_DEB_PATH"
+        sudo apt-get install dkms
+        wget "$V4L2LOOPBACK_DEB_URL" -O "$V4L2LOOPBACK_DEB_PATH"
+        sudo dpkg -i "$V4L2LOOPBACK_DEB_PATH"
     elif can_run yaourt; then
-	yaourt -S gst-v4l2loopback
-	yaourt -S v4l2loopback-git
+        yaourt -S gst-v4l2loopback
+        yaourt -S v4l2loopback-git
     fi
 
     if has_kernel_module v4l2loopback; then
-	info "The v4l2loopback kernel module was installed successfully."
+        info "The v4l2loopback kernel module was installed successfully."
     else
-	error "Could not install the v4l2loopback kernel module through apt-get or yaourt."
+        error "Could not install the v4l2loopback kernel module through apt-get or yaourt."
     fi
 fi
 
@@ -134,11 +146,11 @@ if ! can_run "$ADB"; then
     warning "adb is not available: you'll have to use Wi-Fi, which will be slower. Next time, please install the Android SDK from developer.android.com/sdk."
 else
     while ! phone_plugged && ! confirm "adb is available, but the phone is not plugged in. Are you sure you want to use Wi-Fi (slower)? If you don't, please connect your phone to USB."; do
-	true
+        true
     done
     if phone_plugged; then
-	"$ADB" forward tcp:$PORT tcp:$PORT
-	IP=127.0.0.1
+        "$ADB" forward tcp:$PORT tcp:$PORT
+        IP=127.0.0.1
     fi
 fi
 
@@ -175,15 +187,15 @@ if can_run apt-get; then
     # Debian
     GSTLAUNCH=gst-launch
     if ! can_run "$GSTLAUNCH"; then
-	info "You don't have gst-launch. I'll try to install its Debian/Ubuntu package."
-	sudo apt-get install gstreamer-tools	
+        info "You don't have gst-launch. I'll try to install its Debian/Ubuntu package."
+        sudo apt-get install gstreamer-tools
     fi
 elif can_run pacman; then
     # Arch
     GSTLAUNCH=gst-launch-0.10
     if ! can_run "$GSTLAUNCH"; then
-	info "You don't have gst-launch. I'll try to install its Arch package."
-	sudo pacman -S gstreamer0.10 gstreamer0.10-good-plugins
+        info "You don't have gst-launch. I'll try to install its Arch package."
+        sudo pacman -S gstreamer0.10 gstreamer0.10-good-plugins
     fi
 fi
 if ! can_run "$GSTLAUNCH"; then
@@ -194,10 +206,17 @@ fi
 # Start the GStreamer graph needed to grab the video and audio
 set +e
 info "Using IP Webcam as webcam/microphone. You can now open your videochat app."
-"$GSTLAUNCH" -evt --gst-plugin-spew \
-    souphttpsrc location="http://$IP:$PORT/videofeed" do-timestamp=true is_live=true \
-    ! multipartdemux ! jpegdec ! ffmpegcolorspace ! "video/x-raw-yuv, format=(fourcc){YV12}" ! videoflip method="$FLIP_METHOD" ! v4l2sink device="$DEVICE" \
-    souphttpsrc location="http://$IP:$PORT/audio.wav" do-timestamp=true is_live=true \
-    ! wavparse ! audioconvert ! volume volume=3 ! rglimiter ! pulsesink device=null sync=false \
-    2>&1 | tee feed.log
+"$GSTLAUNCH" -vt --gst-plugin-spew --gst-debug="$GST_DEBUG" \
+  souphttpsrc location="http://$IP:$PORT/videofeed" do-timestamp=true is-live=true \
+    ! multipartdemux \
+    ! jpegdec \
+    ! ffmpegcolorspace ! "video/x-raw-yuv, format=(fourcc)YV12" \
+    ! videoflip method="$FLIP_METHOD" ! videorate \
+    ! v4l2sink device="$DEVICE" \
+  souphttpsrc location="http://$IP:$PORT/audio.wav" do-timestamp=true is-live=true \
+    ! wavparse ! audioconvert \
+    ! volume volume=3 ! rglimiter \
+    ! pulsesink device=null sync=false \
+  2>&1 | tee feed.log
+
 info "Disconnected from IP Webcam. Have a nice day!"
