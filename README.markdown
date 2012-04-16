@@ -11,6 +11,6 @@ This is a shell script which allows Android users to use their phones as a webca
 
 This project includes `prepare-videochat.sh`, which does all these things, except for switching the recording device for your videochat application. It does open `pavucontrol` if it's not running, though. The script installs `v4l2loopback`, the GStreamer tools and the "good" plugins and `pavucontrol` if required, but you will have to install the [Android SDK](http://developer.android.com/sdk) by yourself.
 
-To use this script, simply run it with `./prepare-videochat.sh` and follow instructions. You may have to customize a few variables in the CUSTOMIZATION section before using it, though. You can also use something like `./prepare-videochat.sh horizontal-flip` to flip the video horizontally, in case you might need it.
+To use this script, simply run it with `./prepare-videochat.sh` and follow instructions. You may have to customize a few variables in the CONFIGURATION section before using it, though. You can also use something like `./prepare-videochat.sh horizontal-flip` to flip the video horizontally, in case you might need it.
 
 Disclaimer: the script has only been tested in my local installation of Ubuntu 11.04 and on Arch Linux. I think it should work on most recent Debian-based distributions as well (and Debian, of course). If you need any help, drop me a direct message on Twitter at @antoniogado.
