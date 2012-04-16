@@ -194,7 +194,7 @@ fi
 # Start the GStreamer graph needed to grab the video and audio
 set +e
 info "Using IP Webcam as webcam/microphone. You can now open your videochat app."
-"$GSTLAUNCH" -v \
+"$GSTLAUNCH" -evt --gst-plugin-spew \
     souphttpsrc location="http://$IP:$PORT/videofeed" do-timestamp=true is_live=true \
     ! multipartdemux ! jpegdec ! ffmpegcolorspace ! "video/x-raw-yuv, format=(fourcc){YV12}" ! videoflip method="$FLIP_METHOD" ! v4l2sink device="$DEVICE" \
     souphttpsrc location="http://$IP:$PORT/audio.wav" do-timestamp=true is_live=true \
