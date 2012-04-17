@@ -21,6 +21,11 @@
 # particular, those which change the picture size, such as clockwise
 # or counterclockwise. *-flip and rotate-180 do work, though.
 #
+# IMPORTANT: make sure that audio is enabled on IP Webcam, or the script
+# will not work! If it works, it should stay open after clicking OK on
+# the last message dialog: that's our GStreamer graph processing the
+# audio and video from IP Webcam.
+#
 # Last tested with:
 # - souphttpsrc version 0.10.31
 # - v4l2sink version 0.10.31
