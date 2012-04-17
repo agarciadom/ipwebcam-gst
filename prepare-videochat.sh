@@ -58,7 +58,7 @@ WIFI_IP=192.168.2.122
 PORT=8080
 
 # GStreamer debug string (see gst-launch manpage)
-GST_DEBUG=soup*:0,videoflip:0,ffmpegcolorspace:0
+GST_DEBUG=soup*:0,videoflip:0,ffmpegcolorspace:0,v4l2sink:0
 
 # URL on which the latest v4l2loopback DKMS .deb can be found
 V4L2LOOPBACK_DEB_URL=http://ftp.us.debian.org/debian/pool/main/v/v4l2loopback/v4l2loopback-dkms_0.5.0-1_all.deb
@@ -140,10 +140,19 @@ if ! has_kernel_module v4l2loopback; then
     fi
 fi
 
-# Use the newest /dev/video* device as the webcam: this should help
+# Use the first "v4l2 loopback" device as the webcam: this should help
 # when loading v4l2loopback on a system that already has a regular
 # webcam.
-DEVICE=$(ls -1t /dev/video* | head -1)
+for d in /dev/video*; do
+    if v4l2-ctl -d "$d" -D | grep -q "v4l2 loopback"; then
+        DEVICE=$d
+        break
+    fi
+done
+if [ -z "$DEVICE" ]; then
+    DEVICE=/dev/video0
+    warning "Could not find the v4l2loopback device: falling back to $DEVICE"
+fi
 
 # Decide whether to connect through USB or through wi-fi
 IP=$WIFI_IP
@@ -210,7 +219,7 @@ fi
 
 # Start the GStreamer graph needed to grab the video and audio
 set +e
-info "Using IP Webcam as webcam/microphone. You can now open your videochat app."
+info "Using IP Webcam as webcam/microphone through $DEVICE. You can now open your videochat app."
 "$GSTLAUNCH" -vt --gst-plugin-spew --gst-debug="$GST_DEBUG" \
   souphttpsrc location="http://$IP:$PORT/videofeed" do-timestamp=true is-live=true \
     ! multipartdemux \
