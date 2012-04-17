@@ -13,4 +13,8 @@ This project includes `prepare-videochat.sh`, which does all these things, excep
 
 To use this script, simply run it with `./prepare-videochat.sh` and follow instructions. You may have to customize a few variables in the CONFIGURATION section before using it, though. You can also use something like `./prepare-videochat.sh horizontal-flip` to flip the video horizontally, in case you might need it.
 
+Please make sure that audio is enabled on IP Webcam, or the script won't work!
+
+Here's an idea for future work: switch to Python and use the official GStreamer binding. I'd love to see that, but I don't have enough free time :-(.
+
 Disclaimer: the script has only been tested in my local installation of Ubuntu 11.04 and on Arch Linux. I think it should work on most recent Debian-based distributions as well (and Debian, of course). If you need any help, drop me a direct message on Twitter at @antoniogado.
