@@ -143,12 +143,21 @@ fi
 # Use the first "v4l2 loopback" device as the webcam: this should help
 # when loading v4l2loopback on a system that already has a regular
 # webcam.
-for d in /dev/video*; do
-    if v4l2-ctl -d "$d" -D | grep -q "v4l2 loopback"; then
-        DEVICE=$d
-        break
+if ! can_run v4l2-ctl; then
+    if can_run apt-get; then
+        sudo apt-get install v4l-utils
+    elif can_run pacman; then
+        sudo pacman -S v4l-utils
     fi
-done
+fi
+if can_run v4l2-ctl; then
+    for d in /dev/video*; do
+        if v4l2-ctl -d "$d" -D | grep -q "v4l2 loopback"; then
+            DEVICE=$d
+            break
+        fi
+    done
+fi
 if [ -z "$DEVICE" ]; then
     DEVICE=/dev/video0
     warning "Could not find the v4l2loopback device: falling back to $DEVICE"
