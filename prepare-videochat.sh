@@ -61,7 +61,7 @@ PORT=8080
 GST_DEBUG=soup*:0,videoflip:0,ffmpegcolorspace:0,v4l2sink:0
 
 # URL on which the latest v4l2loopback DKMS .deb can be found
-V4L2LOOPBACK_DEB_URL=http://ftp.us.debian.org/debian/pool/main/v/v4l2loopback/v4l2loopback-dkms_0.5.0-1_all.deb
+V4L2LOOPBACK_DEB_URL=http://ftp.us.debian.org/debian/pool/main/v/v4l2loopback/v4l2loopback-dkms_0.6.1-1_all.deb
 
 # Path to which the v4l2loopback DKMS .deb should be saved
 V4L2LOOPBACK_DEB_PATH=/tmp/v4l2loopback-dkms.deb
