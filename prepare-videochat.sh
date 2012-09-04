@@ -60,8 +60,8 @@ PORT=8080
 # GStreamer debug string (see gst-launch manpage)
 GST_DEBUG=soup*:0,videoflip:0,ffmpegcolorspace:0,v4l2sink:0
 
-# URL on which the latest v4l2loopback DKMS .deb can be found
-V4L2LOOPBACK_DEB_URL=http://ftp.us.debian.org/debian/pool/main/v/v4l2loopback/v4l2loopback-dkms_0.6.1-1_all.deb
+# URL on which a stable v4l2loopback DKMS .deb can be found (0.4.1-1 -> Ubuntu 12.04)
+V4L2LOOPBACK_DEB_URL=http://mirror.pnl.gov/ubuntu//pool/universe/v/v4l2loopback/v4l2loopback-dkms_0.4.1-1_all.deb
 
 # Path to which the v4l2loopback DKMS .deb should be saved
 V4L2LOOPBACK_DEB_PATH=/tmp/v4l2loopback-dkms.deb
@@ -103,6 +103,11 @@ phone_plugged() {
 }
 
 url_reachable() {
+    if ! can_run curl && can_run apt-get; then
+        # Some versions of Ubuntu do not have curl by default (Arch
+        # has it in its core, so we don't need to check that case)
+        sudo apt-get install curl
+    fi
     curl -sI "$1" >/dev/null
 }
 
