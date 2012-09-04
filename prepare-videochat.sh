@@ -60,8 +60,8 @@ PORT=8080
 # GStreamer debug string (see gst-launch manpage)
 GST_DEBUG=soup*:0,videoflip:0,ffmpegcolorspace:0,v4l2sink:0
 
-# URL on which a stable v4l2loopback DKMS .deb can be found (0.4.1-1 -> Ubuntu 12.04)
-V4L2LOOPBACK_DEB_URL=http://mirror.pnl.gov/ubuntu//pool/universe/v/v4l2loopback/v4l2loopback-dkms_0.4.1-1_all.deb
+# URL on which a stable v4l2loopback DKMS .deb can be found (0.5.0-1)
+V4L2LOOPBACK_DEB_URL=http://launchpadlibrarian.net/103765766/v4l2loopback-dkms_0.5.0-1_all.deb
 
 # Path to which the v4l2loopback DKMS .deb should be saved
 V4L2LOOPBACK_DEB_PATH=/tmp/v4l2loopback-dkms.deb
