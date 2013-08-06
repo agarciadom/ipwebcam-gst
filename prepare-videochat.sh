@@ -26,10 +26,31 @@
 # the last message dialog: that's our GStreamer graph processing the
 # audio and video from IP Webcam.
 #
+# ALSO IMPORTANT: if you have issues with this script, make sure that
+# v4l2loopback works properly by running these commands. You'll first
+# need to install mplayer and ensure that your user can write to
+# /dev/video*), and then run these commands on one tab:
+#
+#  sudo modprobe -r v4l2loopback
+#  ls /dev/video*
+#  (Note down the devices available.)
+#  sudo modprobe v4l2loopback
+#  ls /dev/video*
+#  (Note down the new devices: let X be the number of the first new device.)
+#  gst-launch videotestsrc ! v4l2sink device=/dev/videoX
+#
+# Now go to another tab and use mplayer to play it back:
+#
+#  mplayer -tv device=/dev/videoX tv://
+#
+# You should be able to see the GStreamer test video source, which is
+# like a TV test card. Otherwise, there's an issue in your v4l2loopback
+# installation that you should address before using this script.
+#
 # Last tested with:
 # - souphttpsrc version 0.10.31
 # - v4l2sink version 0.10.31
-# - v4l2loopback version 0.5.0
+# - v4l2loopback version 0.7.0
 
 # Exit on first error
 set -e
@@ -52,19 +73,13 @@ else
 fi
 
 # IP used by the phone in your wireless network
-WIFI_IP=192.168.2.122
+WIFI_IP=192.168.2.140
 
 # Port on which IP Webcam is listening
 PORT=8080
 
 # GStreamer debug string (see gst-launch manpage)
 GST_DEBUG=soup*:0,videoflip:0,ffmpegcolorspace:0,v4l2sink:0
-
-# URL on which a stable v4l2loopback DKMS .deb can be found (0.5.0-1)
-V4L2LOOPBACK_DEB_URL=http://launchpadlibrarian.net/103765766/v4l2loopback-dkms_0.5.0-1_all.deb
-
-# Path to which the v4l2loopback DKMS .deb should be saved
-V4L2LOOPBACK_DEB_PATH=/tmp/v4l2loopback-dkms.deb
 
 ### FUNCTIONS
 
@@ -130,9 +145,7 @@ start_iw_server() {
 if ! has_kernel_module v4l2loopback; then
     info "The v4l2loopback kernel module is not installed or could not be loaded. I will try to install the kernel module using your distro's package manager. If that doesn't work, please install v4l2loopback manually from github.com/umlaeute/v4l2loopback."
     if can_run apt-get; then
-        sudo apt-get install dkms
-        wget "$V4L2LOOPBACK_DEB_URL" -O "$V4L2LOOPBACK_DEB_PATH"
-        sudo dpkg -i "$V4L2LOOPBACK_DEB_PATH"
+        sudo apt-get install v4l2loopback-dkms
     elif can_run yaourt; then
         yaourt -S gst-v4l2loopback
         yaourt -S v4l2loopback-git
@@ -239,7 +252,7 @@ info "Using IP Webcam as webcam/microphone through $DEVICE. You can now open you
     ! multipartdemux \
     ! jpegdec \
     ! ffmpegcolorspace ! "video/x-raw-yuv, format=(fourcc)YV12" \
-    ! videoflip method="$FLIP_METHOD" ! videorate \
+    ! videoflip method="$FLIP_METHOD" ! videorate ! "video/x-raw-yuv, framerate=25/1" \
     ! v4l2sink device="$DEVICE" \
   souphttpsrc location="http://$IP:$PORT/audio.wav" do-timestamp=true is-live=true \
     ! wavparse ! audioconvert \
