@@ -47,6 +47,13 @@
 # like a TV test card. Otherwise, there's an issue in your v4l2loopback
 # installation that you should address before using this script.
 #
+# MORE TROUBLESHOOTING: to make sure video works for you (except for
+# v4l2loopback and your video conference software), try this pipeline:
+#
+#   souphttpsrc location="http://$IP:$PORT/videofeed" \
+#               do-timestamp=true is-live=true \
+#    ! multipartdemux ! jpegdec ! ffmpegcolorspace ! ximagesink
+#
 # Last tested with:
 # - souphttpsrc version 0.10.31
 # - v4l2sink version 0.10.31
