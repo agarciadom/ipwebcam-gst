@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Script for using IP Webcam as a microphone/webcam in Ubuntu 11.04 and Arch
-# Copyright (C) 2011-2012 Antonio García Domínguez
+# Script for using IP Webcam as a microphone/webcam in Ubuntu 13.04 and Arch
+# Copyright (C) 2011-2013 Antonio García Domínguez
 # Licensed under GPLv3
 
 # Usage: ./prepare-videochat.sh [flip method]
@@ -54,9 +54,13 @@
 #               do-timestamp=true is-live=true \
 #    ! multipartdemux ! jpegdec ! ffmpegcolorspace ! ximagesink
 #
+# You should be able to see the picture from your webcam on a new window.
+# If that doesn't work, there's something wrong with your connection to
+# the phone, probably.
+#
 # Last tested with:
-# - souphttpsrc version 0.10.31
-# - v4l2sink version 0.10.31
+# - souphttpsrc version 1.0.6
+# - v4l2sink version 1.0.6
 # - v4l2loopback version 0.7.0
 
 # Exit on first error
@@ -86,7 +90,7 @@ WIFI_IP=192.168.2.140
 PORT=8080
 
 # GStreamer debug string (see gst-launch manpage)
-GST_DEBUG=soup*:0,videoflip:0,ffmpegcolorspace:0,v4l2sink:0
+GST_DEBUG=souphttpsrc:0,videoflip:0,ffmpegcolorspace:0,v4l2sink:0,pulse:0
 
 ### FUNCTIONS
 
@@ -152,7 +156,7 @@ start_iw_server() {
 if ! has_kernel_module v4l2loopback; then
     info "The v4l2loopback kernel module is not installed or could not be loaded. I will try to install the kernel module using your distro's package manager. If that doesn't work, please install v4l2loopback manually from github.com/umlaeute/v4l2loopback."
     if can_run apt-get; then
-        sudo apt-get install v4l2loopback-dkms
+        sudo apt-get install python-apport v4l2loopback-dkms 
     elif can_run yaourt; then
         yaourt -S gst-v4l2loopback
         yaourt -S v4l2loopback-git
@@ -264,7 +268,7 @@ info "Using IP Webcam as webcam/microphone through $DEVICE. You can now open you
   souphttpsrc location="http://$IP:$PORT/audio.wav" do-timestamp=true is-live=true \
     ! wavparse ! audioconvert \
     ! volume volume=3 ! rglimiter \
-    ! pulsesink device=null sync=false \
+    ! pulsesink device=auto_null sync=false \
   2>&1 | tee feed.log
 
 info "Disconnected from IP Webcam. Have a nice day!"
