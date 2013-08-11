@@ -26,10 +26,13 @@
 # the last message dialog: that's our GStreamer graph processing the
 # audio and video from IP Webcam.
 #
-# ALSO IMPORTANT: if you have issues with this script, make sure that
-# v4l2loopback works properly by running these commands. You'll first
-# need to install mplayer and ensure that your user can write to
-# /dev/video*), and then run these commands on one tab:
+# TROUBLESHOOTING
+#
+# 1. Does v4l2loopback work properly?
+#
+# Try running these commands. You'll first need to install mplayer and
+# ensure that your user can write to /dev/video*), and then run these
+# commands on one tab:
 #
 #  sudo modprobe -r v4l2loopback
 #  ls /dev/video*
@@ -47,16 +50,19 @@
 # like a TV test card. Otherwise, there's an issue in your v4l2loopback
 # installation that you should address before using this script.
 #
-# MORE TROUBLESHOOTING: to make sure video works for you (except for
-# v4l2loopback and your video conference software), try this pipeline:
+# 2. Does the video connection work properly?
 #
-#   souphttpsrc location="http://$IP:$PORT/videofeed" \
+# To make sure the video from IP Webcam works for you (except for
+# v4l2loopback and your video conference software), try this command
+# with a simplified pipeline:
+#
+#   gst-launch souphttpsrc location="http://$IP:$PORT/videofeed" \
 #               do-timestamp=true is-live=true \
 #    ! multipartdemux ! jpegdec ! ffmpegcolorspace ! ximagesink
 #
 # You should be able to see the picture from your webcam on a new window.
 # If that doesn't work, there's something wrong with your connection to
-# the phone, probably.
+# the phone.
 #
 # Last tested with:
 # - souphttpsrc version 1.0.6
@@ -156,7 +162,7 @@ start_iw_server() {
 if ! has_kernel_module v4l2loopback; then
     info "The v4l2loopback kernel module is not installed or could not be loaded. I will try to install the kernel module using your distro's package manager. If that doesn't work, please install v4l2loopback manually from github.com/umlaeute/v4l2loopback."
     if can_run apt-get; then
-        sudo apt-get install python-apport v4l2loopback-dkms 
+        sudo apt-get install python-apport v4l2loopback-dkms
     elif can_run yaourt; then
         yaourt -S gst-v4l2loopback
         yaourt -S v4l2loopback-git
@@ -222,6 +228,8 @@ done
 if !(pactl list | grep -q module-null-sink); then
     pactl load-module module-null-sink
 fi
+NULL_SINK=$(pactl list sinks | \
+            sed -n -e '/Name:/h; /module-null-sink/{x; s/\s*Name:\s*//g; p; q}' )
 
 # Install and open pavucontrol as needed
 if ! can_run pavucontrol; then
@@ -268,7 +276,7 @@ info "Using IP Webcam as webcam/microphone through $DEVICE. You can now open you
   souphttpsrc location="http://$IP:$PORT/audio.wav" do-timestamp=true is-live=true \
     ! wavparse ! audioconvert \
     ! volume volume=3 ! rglimiter \
-    ! pulsesink device=auto_null sync=false \
+    ! pulsesink device="$NULL_SINK" sync=false \
   2>&1 | tee feed.log
 
 info "Disconnected from IP Webcam. Have a nice day!"
