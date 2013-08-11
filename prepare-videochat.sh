@@ -164,7 +164,6 @@ if ! has_kernel_module v4l2loopback; then
     if can_run apt-get; then
         sudo apt-get install python-apport v4l2loopback-dkms
     elif can_run yaourt; then
-        yaourt -S gst-v4l2loopback
         yaourt -S v4l2loopback-git
     fi
 
@@ -225,7 +224,7 @@ while ! iw_server_is_started; do
 done
 
 # Load null-sink if needed
-if !(pactl list | grep -q module-null-sink); then
+if !(pactl list sinks | grep -q module-null-sink); then
     pactl load-module module-null-sink
 fi
 NULL_SINK=$(pactl list sinks | \
@@ -237,7 +236,7 @@ if ! can_run pavucontrol; then
     sudo apt-get install pavucontrol
 fi
 if ! pgrep pavucontrol; then
-    info "We will open now pavucontrol. You should leave it open to change the recording device of your video chat program to 'Monitor Null Output'. NOTE: make sure that in 'Output Devices' *all* devices are listed."
+    info "We will open now pavucontrol. You should leave it open to change the recording device of your video chat program to 'Monitor Null Output'. NOTE: make sure that in 'Output Devices' *all* devices are listed, and in the Playback tab the $GSTLAUNCH program sends its audio to the 'Null Sink'."
     pavucontrol &
 fi
 
@@ -265,7 +264,7 @@ fi
 
 # Start the GStreamer graph needed to grab the video and audio
 set +e
-info "Using IP Webcam as webcam/microphone through $DEVICE. You can now open your videochat app."
+info "Using IP Webcam as webcam/microphone through v4l2loopback device $DEVICE and PulseAudio sink '$NULL_SINK'. You can now open your videochat app."
 "$GSTLAUNCH" -vt --gst-plugin-spew --gst-debug="$GST_DEBUG" \
   souphttpsrc location="http://$IP:$PORT/videofeed" do-timestamp=true is-live=true \
     ! multipartdemux \
