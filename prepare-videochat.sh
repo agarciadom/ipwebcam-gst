@@ -227,7 +227,7 @@ done
 if !(pactl list sinks | grep -q module-null-sink); then
     pactl load-module module-null-sink
 fi
-NULL_SINK=$(pactl list sinks | \
+NULL_SINK=$(LC_ALL=C pactl list sinks | \
             sed -n -e '/Name:/h; /module-null-sink/{x; s/\s*Name:\s*//g; p; q}' )
 
 # Install and open pavucontrol as needed

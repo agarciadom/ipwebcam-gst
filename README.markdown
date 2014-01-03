@@ -18,3 +18,5 @@ Please make sure that audio is enabled on IP Webcam, or the script won't work!
 Here's an idea for future work: switch to Python and use the official GStreamer binding. I'd love to see that, but I don't have enough free time :-(.
 
 Disclaimer: the script has only been tested in my local installation of Ubuntu 13.04 and on Arch Linux. I think it should work on most recent Debian-based distributions as well (and Debian, of course). If you need any help, please create an issue on this project.
+
+Note: the v4l2loopback-dkms package seems to be broken in Saucy (13.10), as it refers to an old v4l2loopback release (0.7.0) and not to the latest version as of date (0.8.0). Please install v4l2loopback from its official Github repo.
