@@ -64,6 +64,20 @@
 # If that doesn't work, there's something wrong with your connection to
 # the phone.
 #
+# 3. Are you plugging several devices into your PC?
+#
+# By default, the script assumes you're only plugging one device into
+# your computer. If you're plugging in several Android devices to your
+# computer, you will first need to tell this script which one should
+# be used. Run 'adb devices' with only the desired device plugged in,
+# and note down the identifer.
+#
+# Then, uncomment the line that adds the -s flag to ADB_FLAGS below,
+# replacing 'deviceid' with the ID you just found, and run the script
+# normally.
+#
+# --
+#
 # Last tested with:
 # - souphttpsrc version 1.0.6
 # - v4l2sink version 1.0.6
@@ -88,6 +102,10 @@ if which adb; then
 else
     ADB=$ADB_PATH
 fi
+
+# Flags for ADB.
+ADB_FLAGS=
+#ADB_FLAGS="$ADB_FLAGS -s deviceid" # use when you need to pick from several devices (check deviceid in 'adb devices')
 
 # IP used by the phone in your wireless network
 WIFI_IP=192.168.2.140
@@ -127,11 +145,11 @@ can_run() {
 }
 
 start_adb() {
-    can_run "$ADB" && "$ADB" start-server
+    can_run "$ADB" && "$ADB" $ADB_FLAGS start-server
 }
 
 phone_plugged() {
-    start_adb && test "$("$ADB" get-state)" == "device"
+    start_adb && test "$("$ADB" $ADB_FLAGS get-state)" == "device"
 }
 
 url_reachable() {
@@ -144,7 +162,7 @@ url_reachable() {
 }
 
 send_intent() {
-    start_adb && "$ADB" shell am start -a android.intent.action.MAIN -n $@
+    start_adb && "$ADB" $ADB_FLAGS shell am start -a android.intent.action.MAIN -n $@
 }
 
 iw_server_is_started() {
@@ -206,7 +224,7 @@ else
         true
     done
     if phone_plugged; then
-        "$ADB" forward tcp:$PORT tcp:$PORT
+        "$ADB" $ADB_FLAGS forward tcp:$PORT tcp:$PORT
         IP=127.0.0.1
     fi
 fi
