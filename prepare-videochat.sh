@@ -149,7 +149,7 @@ start_adb() {
 }
 
 phone_plugged() {
-    start_adb && test "$("$ADB" $ADB_FLAGS get-state)" == "device"
+    start_adb && test "$("$ADB" $ADB_FLAGS get-state)" = "device"
 }
 
 url_reachable() {
