@@ -202,21 +202,34 @@ elif [ -f /etc/debian_version ] ; then
 fi
 
 GST_VER="0.10"
-GST_CONVERTER="ffmpegcolorspace"
-GST_MIMETYPE="video/x-raw-yuv"
-GST_FORMAT="format=(fourcc)YV12"
+GST_VIDEO_CONVERTER="ffmpegcolorspace"
+GST_VIDEO_MIMETYPE="video/x-raw-yuv"
+GST_VIDEO_FORMAT="format=(fourcc)YV12"
 
-GST_0_10_MIMETYPE=$GST_MIMETYPE
-GST_0_10_FORMAT=$GST_FORMAT
+GST_AUDIO_MIMETYPE="audio/x-raw-int"
+GST_AUDIO_FORMAT="width=16,depth=16,endianness=1234,signed=true,channels=1"
+GST_AUDIO_RATE="rate=41000"
+
+GST_0_10_VIDEO_MIMETYPE=$GST_VIDEO_MIMETYPE
+GST_0_10_VIDEO_FORMAT=$GST_VIDEO_FORMAT
 
 if [ $DIST = "Debian" -a `echo "$RELEASE >= 8.0"   | bc` -eq 1 ] ||\
    [ $DIST = "Ubuntu" -a `echo "$RELEASE >= 14.04" | bc` -eq 1 ]
 then
     GST_VER="1.0"
-    GST_CONVERTER="videoconvert"
-    GST_MIMETYPE="video/x-raw"
-    GST_FORMAT="format=YV12"
+    GST_VIDEO_CONVERTER="videoconvert"
+    GST_VIDEO_MIMETYPE="video/x-raw"
+    GST_VIDEO_FORMAT="format=YV12"
+
+    GST_AUDIO_MIMETYPE="audio/x-raw"
+    GST_AUDIO_FORMAT="format=F32E,channels=1"
 fi
+
+DIMENSIONS="width=$WIDTH,height=$HEIGHT"
+
+GST_0_10_VIDEO_CAPS="$GST_0_10_VIDEO_MIMETYPE,$GST_0_10_VIDEO_FORMAT,$DIMENSIONS"
+VIDEO_CAPS="$GST_VIDEO_MIMETYPE,$GST_VIDEO_FORMAT,$DIMENSIONS,framerate=$GST_FPS/1"
+AUDIO_CAPS="$GST_AUDIO_MIMETYPE,$GST_AUDIO_FORMAT,$GST_AUDIO_RATE"
 
 # GStreamer debug string (see gst-launch manpage)
 GST_DEBUG=souphttpsrc:0,videoflip:0,$GST_CONVERTER:0,v4l2sink:0,pulse:0
@@ -313,8 +326,6 @@ ECANCEL_ID=$(modid_by_sinkname "${SINK_NAME}_echo_cancel")
 
 if [ -z $SINK_ID ] ; then
     SINK_ID=$(pactl load-module module-null-sink \
-                    rate=44100 \
-                    format=s16le \
                     sink_name="$SINK_NAME" \
                     sink_properties="device.description='IP\ Webcam'")
 fi
@@ -352,21 +363,18 @@ fi
 # Start the GStreamer graph needed to grab the video and audio
 set +e
 
-DIMENSIONS="width=$WIDTH,height=$HEIGHT"
+#sudo v4l2loopback-ctl set-caps $GST_0_10_VIDEO_CAPS $DEVICE
 
-GST_0_10_CAPS="$GST_0_10_MIMETYPE,$GST_0_10_FORMAT,$DIMENSIONS"
-CAPS="$GST_MIMETYPE,$GST_FORMAT,$DIMENSIONS,framerate=$GST_FPS/1" \
-#sudo v4l2loopback-ctl set-caps $GST_0_10_CAPS $DEVICE
-
-"$GSTLAUNCH" -e -vt --gst-plugin-spew --gst-debug="$GST_DEBUG" \
+"$GSTLAUNCH" -e -vt --gst-plugin-spew \
+             --gst-debug="$GST_DEBUG" \
   souphttpsrc location="$VIDEO_URL" do-timestamp=true is-live=true \
     ! multipartdemux \
     ! jpegdec \
     $GST_FLIP \
-    ! $GST_CONVERTER \
+    ! $GST_VIDEO_CONVERTER \
     ! videoscale \
     ! videorate \
-    ! $CAPS \
+    ! $VIDEO_CAPS \
     ! v4l2sink device="$DEVICE" sync=true \
   souphttpsrc location="$AUDIO_URL" do-timestamp=true is-live=true \
     ! wavparse \
@@ -378,8 +386,6 @@ CAPS="$GST_MIMETYPE,$GST_FORMAT,$DIMENSIONS,framerate=$GST_FPS/1" \
 
 GSTLAUNCH_PID=$!
 
-echo "PID of $GSTLAUNCH is $GSTLAUNCH_PID"
-
 info "IP Webcam video is streaming through v4l2loopback device $DEVICE.
 IP Webcam audio is streaming through pulseaudio sink '$SINK_NAME'.
 You can now open your videochat app."
@@ -387,7 +393,7 @@ You can now open your videochat app."
 read -p "Press enter to end stream"
 
 kill $GSTLAUNCH_PID
-pactl set-default-source $DEFAULT_SOURCE
+pactl set-default-source ${DEFAULT_SOURCE}
 pactl unload-module ${ECANCEL_ID}
 pactl unload-module ${SINK_ID}
 
