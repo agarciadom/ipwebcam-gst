@@ -379,6 +379,7 @@ set +e
   souphttpsrc location="$AUDIO_URL" do-timestamp=true is-live=true \
     ! wavparse \
     ! audioconvert \
+    ! audioresample \
     ! volume volume=3 \
     ! rglimiter \
     ! pulsesink device="$SINK_NAME" sync=true \
