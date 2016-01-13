@@ -102,7 +102,7 @@ fi
 # If your "adb" is not in your $PATH, set the full path to it here.
 # If "adb" is in your $PATH, you don't have to change this option.
 ADB_PATH=~/bin/android-sdk-linux_x86/platform-tools/adb
-if which adb; then
+if which adb > /dev/null ; then
     ADB=$(which adb)
 else
     ADB=$ADB_PATH
@@ -207,9 +207,12 @@ GST_VIDEO_MIMETYPE="video/x-raw-yuv"
 GST_VIDEO_FORMAT="format=(fourcc)YV12"
 
 GST_AUDIO_MIMETYPE="audio/x-raw-int"
-GST_AUDIO_FORMAT="width=16,depth=16,endianness=1234,signed=true,channels=1"
-GST_AUDIO_RATE="rate=41000"
+GST_AUDIO_FORMAT="width=16,depth=16,endianness=1234,signed=true"
+GST_AUDIO_RATE="rate=44100"
+GST_AUDIO_CHANNELS="channels=1"
+GST_AUDIO_LAYOUT=""
 
+GST_1_0_AUDIO_FORMAT="format=S16LE"
 GST_0_10_VIDEO_MIMETYPE=$GST_VIDEO_MIMETYPE
 GST_0_10_VIDEO_FORMAT=$GST_VIDEO_FORMAT
 
@@ -222,14 +225,16 @@ then
     GST_VIDEO_FORMAT="format=YV12"
 
     GST_AUDIO_MIMETYPE="audio/x-raw"
-    GST_AUDIO_FORMAT="format=F32E,channels=1"
+    GST_AUDIO_FORMAT=$GST_1_0_AUDIO_FORMAT
+    GST_AUDIO_LAYOUT=",layout=interleaved"
 fi
 
 DIMENSIONS="width=$WIDTH,height=$HEIGHT"
 
 GST_0_10_VIDEO_CAPS="$GST_0_10_VIDEO_MIMETYPE,$GST_0_10_VIDEO_FORMAT,$DIMENSIONS"
-VIDEO_CAPS="$GST_VIDEO_MIMETYPE,$GST_VIDEO_FORMAT,$DIMENSIONS,framerate=$GST_FPS/1"
-AUDIO_CAPS="$GST_AUDIO_MIMETYPE,$GST_AUDIO_FORMAT,$GST_AUDIO_RATE"
+GST_VIDEO_CAPS="$GST_VIDEO_MIMETYPE,$GST_VIDEO_FORMAT,$DIMENSIONS,framerate=$GST_FPS/1"
+GST_AUDIO_CAPS="$GST_AUDIO_MIMETYPE,$GST_AUDIO_FORMAT$GST_AUDIO_LAYOUT,$GST_AUDIO_RATE,$GST_AUDIO_CHANNELS"
+PA_AUDIO_CAPS="$GST_AUDIO_FORMAT $GST_AUDIO_RATE $GST_AUDIO_CHANNELS"
 
 # GStreamer debug string (see gst-launch manpage)
 GST_DEBUG=souphttpsrc:0,videoflip:0,$GST_CONVERTER:0,v4l2sink:0,pulse:0
@@ -327,8 +332,7 @@ ECANCEL_ID=$(modid_by_sinkname "${SINK_NAME}_echo_cancel")
 if [ -z $SINK_ID ] ; then
     SINK_ID=$(pactl load-module module-null-sink \
                     sink_name="$SINK_NAME" \
-                    format=s16le \
-                    rate=44100 \
+                    $PA_AUDIO_CAPS \
                     sink_properties="device.description='IP\ Webcam'")
 fi
 
@@ -337,6 +341,7 @@ if [ -z $ECANCEL_ID ] ; then
                        sink_name="${SINK_NAME}_echo_cancel" \
                        source_master="$SINK_NAME.monitor" \
                        sink_master="$DEFAULT_SINK" \
+                       $PA_AUDIO_CAPS \
                        aec_method="webrtc" save_aec=true use_volume_sharing=true)
 fi
 
@@ -376,10 +381,10 @@ set +e
     ! $GST_VIDEO_CONVERTER \
     ! videoscale \
     ! videorate \
-    ! $VIDEO_CAPS \
+    ! $GST_VIDEO_CAPS \
     ! v4l2sink device="$DEVICE" sync=true \
   souphttpsrc location="$AUDIO_URL" do-timestamp=true is-live=true \
-    ! audio/x-raw,format=S16LE,layout=interleaved,rate=44100,channels=1 \
+    ! $GST_AUDIO_CAPS \
     ! pulsesink device="$SINK_NAME" sync=true \
     2>&1 > feed.log &
 
@@ -389,9 +394,10 @@ info "IP Webcam video is streaming through v4l2loopback device $DEVICE.
 IP Webcam audio is streaming through pulseaudio sink '$SINK_NAME'.
 You can now open your videochat app."
 
-read -p "Press enter to end stream"
+echo "Press enter to end stream"
+perl -e '<STDIN>'
 
-kill $GSTLAUNCH_PID
+kill $GSTLAUNCH_PID > /dev/null 2>&1 || echo ""
 pactl set-default-source ${DEFAULT_SOURCE}
 pactl unload-module ${ECANCEL_ID}
 pactl unload-module ${SINK_ID}
