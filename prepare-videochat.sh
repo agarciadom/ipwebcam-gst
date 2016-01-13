@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# Script for using IP Webcam as a microphone/webcam in Ubuntu 13.04 and Arch
+# Script for using IP Webcam as a microphone/webcam in Debian Jessie,
+# Ubuntu 13.04, 14.04 and Arch
+
 # Copyright (C) 2011-2013 Antonio García Domínguez
+# Copyright (C) 2016 C.J. Adams-Collier
 # Licensed under GPLv3
 
 # Usage: ./prepare-videochat.sh [flip method]
@@ -31,8 +34,7 @@
 # 1. Does v4l2loopback work properly?
 #
 # Try running these commands. You'll first need to install mplayer and
-# ensure that your user can write to /dev/video*), and then run these
-# commands on one tab:
+# ensure that your user can write to /dev/video*).
 #
 #  sudo modprobe -r v4l2loopback
 #  ls /dev/video*
@@ -40,11 +42,9 @@
 #  sudo modprobe v4l2loopback
 #  ls /dev/video*
 #  (Note down the new devices: let X be the number of the first new device.)
-#  gst-launch videotestsrc ! v4l2sink device=/dev/videoX
+#  v4l2-ctl -D -d /dev/videoX
+#  gst-launch videotestsrc ! v4l2sink device=/dev/videoX & mplayer -tv device=/dev/videoX tv://
 #
-# Now go to another tab and use mplayer to play it back:
-#
-#  mplayer -tv device=/dev/videoX tv://
 #
 # You should be able to see the GStreamer test video source, which is
 # like a TV test card. Otherwise, there's an issue in your v4l2loopback
@@ -92,12 +92,17 @@ else
     FLIP_METHOD=none
 fi
 
+GST_FLIP="! videoflip method=\"$FLIP_METHOD\" "
+if [ $FLIP_METHOD = 'none' ]; then
+    GST_FLIP=""
+fi
+
 ### CONFIGURATION
 
 # If your "adb" is not in your $PATH, set the full path to it here.
 # If "adb" is in your $PATH, you don't have to change this option.
 ADB_PATH=~/bin/android-sdk-linux_x86/platform-tools/adb
-if which adb; then
+if which adb > /dev/null ; then
     ADB=$(which adb)
 else
     ADB=$ADB_PATH
@@ -113,30 +118,35 @@ WIFI_IP=192.168.2.140
 # Port on which IP Webcam is listening
 PORT=8080
 
-# GStreamer debug string (see gst-launch manpage)
-GST_DEBUG=souphttpsrc:0,videoflip:0,ffmpegcolorspace:0,v4l2sink:0,pulse:0
+# Dimensions of video
+WIDTH=640
+HEIGHT=480
+
+# Frame rate of video
+GST_FPS=5
+
 
 ### FUNCTIONS
 
 has_kernel_module() {
-    sudo modprobe -q "$1"
+    sudo modprobe -q "$1" > /dev/null 2>&1
 }
 
 error() {
-    zenity --error --text "$@"
+    zenity --error --text "$@" > /dev/null 2>&1
     exit 1
 }
 
 warning() {
-    zenity --warning --text "$@"
+    zenity --warning --text "$@" > /dev/null 2>&1
 }
 
 info() {
-    zenity --info --text "$@"
+    zenity --info --text "$@" > /dev/null 2>&1
 }
 
 confirm() {
-    zenity --question --text "$@"
+    zenity --question --text "$@" > /dev/null 2>&1
 }
 
 can_run() {
@@ -156,7 +166,7 @@ url_reachable() {
     if ! can_run curl && can_run apt-get; then
         # Some versions of Ubuntu do not have curl by default (Arch
         # has it in its core, so we don't need to check that case)
-        sudo apt-get install curl
+        sudo apt-get install -y curl
     fi
     curl -sI "$1" >/dev/null
 }
@@ -174,13 +184,75 @@ start_iw_server() {
     sleep 2s
 }
 
+modid_by_sinkname() {
+    pacmd list-sinks | grep -e 'name:' -e 'module:' | grep -A1 "name: <$1>" | grep module: | cut -f2 -d: | tr -d ' '
+}
+
+modid_by_sourcename() {
+    pacmd list-sources | grep -e 'name:' -e 'module:' | grep -A1 "name: <$1>" | grep module: | cut -f2 -d: | tr -d ' '
+}
+
+
+if can_run lsb_release; then
+    DIST=`lsb_release -i | awk -F: '{print $2}'`
+    RELEASE=`lsb_release -r | awk -F: '{print $2}'`
+elif [ -f /etc/debian_version ] ; then
+    DIST="Debian"
+    RELEASE=`perl -ne 'chomp; if(m:(jessie|testing|sid):){print "8.0"}elsif(m:[\d\.]+:){print}else{print "0.0"}' < /etc/debian_version`
+fi
+
+GST_VER="0.10"
+GST_VIDEO_CONVERTER="ffmpegcolorspace"
+GST_VIDEO_MIMETYPE="video/x-raw-yuv"
+GST_VIDEO_FORMAT="format=(fourcc)YV12"
+
+GST_AUDIO_MIMETYPE="audio/x-raw-int"
+GST_AUDIO_FORMAT="width=16,depth=16,endianness=1234,signed=true"
+GST_AUDIO_RATE="rate=44100"
+GST_AUDIO_CHANNELS="channels=1"
+GST_AUDIO_LAYOUT=""
+
+GST_1_0_AUDIO_FORMAT="format=S16LE"
+GST_0_10_VIDEO_MIMETYPE=$GST_VIDEO_MIMETYPE
+GST_0_10_VIDEO_FORMAT=$GST_VIDEO_FORMAT
+
+if [ $DIST = "Debian" -a `echo "$RELEASE >= 8.0"   | bc` -eq 1 ] ||\
+   [ $DIST = "Ubuntu" -a `echo "$RELEASE >= 14.04" | bc` -eq 1 ]
+then
+    GST_VER="1.0"
+    GST_VIDEO_CONVERTER="videoconvert"
+    GST_VIDEO_MIMETYPE="video/x-raw"
+    GST_VIDEO_FORMAT="format=YV12"
+
+    GST_AUDIO_MIMETYPE="audio/x-raw"
+    GST_AUDIO_FORMAT=$GST_1_0_AUDIO_FORMAT
+    GST_AUDIO_LAYOUT=",layout=interleaved"
+fi
+
+DIMENSIONS="width=$WIDTH,height=$HEIGHT"
+
+GST_0_10_VIDEO_CAPS="$GST_0_10_VIDEO_MIMETYPE,$GST_0_10_VIDEO_FORMAT,$DIMENSIONS"
+GST_VIDEO_CAPS="$GST_VIDEO_MIMETYPE,$GST_VIDEO_FORMAT,$DIMENSIONS,framerate=$GST_FPS/1"
+GST_AUDIO_CAPS="$GST_AUDIO_MIMETYPE,$GST_AUDIO_FORMAT$GST_AUDIO_LAYOUT,$GST_AUDIO_RATE,$GST_AUDIO_CHANNELS"
+PA_AUDIO_CAPS="$GST_AUDIO_FORMAT $GST_AUDIO_RATE $GST_AUDIO_CHANNELS"
+
+# GStreamer debug string (see gst-launch manpage)
+GST_DEBUG=souphttpsrc:0,videoflip:0,$GST_CONVERTER:0,v4l2sink:0,pulse:0
+
 ### MAIN BODY
 
 # Check if the user has v4l2loopback
 if ! has_kernel_module v4l2loopback; then
-    info "The v4l2loopback kernel module is not installed or could not be loaded. I will try to install the kernel module using your distro's package manager. If that doesn't work, please install v4l2loopback manually from github.com/umlaeute/v4l2loopback."
-    if can_run apt-get; then
-        sudo apt-get install python-apport v4l2loopback-dkms
+    info "The v4l2loopback kernel module is not installed or could not be loaded. Attempting to install the kernel module using your distro's package manager."
+    if [ $DIST = "Debian" ] || [ $DIST = "Ubuntu" ]; then
+        V4L2LOOPBACK_PKGS="v4l2loopback-dkms"
+        if [ $DIST = "Ubuntu" ]; then
+           V4L2LOOPBACK_PKGS="${V4L2LOOPBACK_PKGS} python-apport"
+        fi
+        sudo apt-get -y install $V4L2LOOPBACK_PKGS
+        if [ $? != 0 ]; then
+            info "Installation failed.  Please install v4l2loopback manually from github.com/umlaeute/v4l2loopback."
+        fi
     elif can_run yaourt; then
         yaourt -S v4l2loopback-git
     fi
@@ -192,12 +264,21 @@ if ! has_kernel_module v4l2loopback; then
     fi
 fi
 
+# check if the user has the pulse gst plugin installed
+if [ ! -f /usr/lib/*/gstreamer-$GST_VER/libgstpulse.so ]; then
+    if [ $DIST = "Debian" ] || [ $DIST = "Ubuntu" ]; then
+        sudo apt-get install -y gstreamer${GST_VER}-pulseaudio
+    elif can_run yaourt; then
+        echo "we should figure out what package supplies this"
+    fi
+fi
+
 # Use the first "v4l2 loopback" device as the webcam: this should help
 # when loading v4l2loopback on a system that already has a regular
 # webcam.
 if ! can_run v4l2-ctl; then
     if can_run apt-get; then
-        sudo apt-get install v4l-utils
+        sudo apt-get install -y v4l-utils
     elif can_run pacman; then
         sudo pacman -S v4l-utils
     fi
@@ -241,38 +322,44 @@ while ! iw_server_is_started; do
     info "The IP Webcam video feed is not reachable at $VIDEO_URL. Please open IP Webcam in your phone and start the server."
 done
 
-# Load null-sink if needed
-if !(pactl list sinks | grep -q module-null-sink); then
-    pactl load-module module-null-sink
-fi
-NULL_SINK=$(LC_ALL=C pactl list sinks | \
-            sed -n -e '/Name:/h; /module-null-sink/{x; s/\s*Name:\s*//g; p; q}' )
+DEFAULT_SINK=$(pacmd dump | mawk '/set-default-sink/ {print $2}')
+DEFAULT_SOURCE=$(pacmd dump | mawk '/set-default-source/ {print $2}')
 
-# Install and open pavucontrol as needed
-if ! can_run pavucontrol; then
-    info "You don't have pavucontrol. I'll try to install its Debian/Ubuntu package."
-    sudo apt-get install pavucontrol
+SINK_NAME="ipwebcam"
+SINK_ID=$(modid_by_sinkname $SINK_NAME)
+ECANCEL_ID=$(modid_by_sinkname "${SINK_NAME}_echo_cancel")
+
+if [ -z $SINK_ID ] ; then
+    SINK_ID=$(pactl load-module module-null-sink \
+                    sink_name="$SINK_NAME" \
+                    $PA_AUDIO_CAPS \
+                    sink_properties="device.description='IP\ Webcam'")
 fi
-if ! pgrep pavucontrol; then
-    info "We will open now pavucontrol. You should leave it open to change the recording device of your video chat program to 'Monitor Null Output'. NOTE: make sure that in 'Output Devices' *all* devices are listed, and in the Playback tab the $GSTLAUNCH program sends its audio to the 'Null Sink'."
-    pavucontrol &
+
+if [ -z $ECANCEL_ID ] ; then
+    ECANCEL_ID=$(pactl load-module module-echo-cancel \
+                       sink_name="${SINK_NAME}_echo_cancel" \
+                       source_master="$SINK_NAME.monitor" \
+                       sink_master="$DEFAULT_SINK" \
+                       $PA_AUDIO_CAPS \
+                       aec_method="webrtc" save_aec=true use_volume_sharing=true)
 fi
+
+pactl set-default-source $SINK_NAME.monitor
 
 # Check for gst-launch
-GSTLAUNCH=gst-launch
-if can_run apt-get; then
+GSTLAUNCH=gst-launch-${GST_VER}
+if [ $DIST = "Debian" ]; then
     # Debian
-    GSTLAUNCH=gst-launch
     if ! can_run "$GSTLAUNCH"; then
         info "You don't have gst-launch. I'll try to install its Debian/Ubuntu package."
-        sudo apt-get install gstreamer-tools
+        sudo apt-get install -y gstreamer${GST_VER}-tools
     fi
 elif can_run pacman; then
     # Arch
-    GSTLAUNCH=gst-launch-0.10
     if ! can_run "$GSTLAUNCH"; then
         info "You don't have gst-launch. I'll try to install its Arch package."
-        sudo pacman -S gstreamer0.10 gstreamer0.10-good-plugins
+        sudo pacman -S gstreamer${GST_VER} gstreamer${GST_VER}-good-plugins
     fi
 fi
 if ! can_run "$GSTLAUNCH"; then
@@ -282,18 +369,37 @@ fi
 
 # Start the GStreamer graph needed to grab the video and audio
 set +e
-info "Using IP Webcam as webcam/microphone through v4l2loopback device $DEVICE and PulseAudio sink '$NULL_SINK'. You can now open your videochat app."
-"$GSTLAUNCH" -vt --gst-plugin-spew --gst-debug="$GST_DEBUG" \
-  souphttpsrc location="http://$IP:$PORT/videofeed" do-timestamp=true is-live=true \
+
+#sudo v4l2loopback-ctl set-caps $GST_0_10_VIDEO_CAPS $DEVICE
+
+"$GSTLAUNCH" -e -vt --gst-plugin-spew \
+             --gst-debug="$GST_DEBUG" \
+  souphttpsrc location="$VIDEO_URL" do-timestamp=true is-live=true \
     ! multipartdemux \
     ! jpegdec \
-    ! ffmpegcolorspace ! "video/x-raw-yuv, format=(fourcc)YV12" \
-    ! videoflip method="$FLIP_METHOD" ! videorate ! "video/x-raw-yuv, framerate=25/1" \
-    ! v4l2sink device="$DEVICE" \
-  souphttpsrc location="http://$IP:$PORT/audio.wav" do-timestamp=true is-live=true \
-    ! wavparse ! audioconvert \
-    ! volume volume=3 ! rglimiter \
-    ! pulsesink device="$NULL_SINK" sync=false \
-  2>&1 | tee feed.log
+    $GST_FLIP \
+    ! $GST_VIDEO_CONVERTER \
+    ! videoscale \
+    ! videorate \
+    ! $GST_VIDEO_CAPS \
+    ! v4l2sink device="$DEVICE" sync=true \
+  souphttpsrc location="$AUDIO_URL" do-timestamp=true is-live=true \
+    ! $GST_AUDIO_CAPS \
+    ! pulsesink device="$SINK_NAME" sync=true \
+    2>&1 > feed.log &
+
+GSTLAUNCH_PID=$!
+
+info "IP Webcam video is streaming through v4l2loopback device $DEVICE.
+IP Webcam audio is streaming through pulseaudio sink '$SINK_NAME'.
+You can now open your videochat app."
+
+echo "Press enter to end stream"
+perl -e '<STDIN>'
+
+kill $GSTLAUNCH_PID > /dev/null 2>&1 || echo ""
+pactl set-default-source ${DEFAULT_SOURCE}
+pactl unload-module ${ECANCEL_ID}
+pactl unload-module ${SINK_ID}
 
 info "Disconnected from IP Webcam. Have a nice day!"
