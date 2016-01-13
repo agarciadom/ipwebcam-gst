@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# Script for using IP Webcam as a microphone/webcam in Ubuntu 13.04 and Arch
+# Script for using IP Webcam as a microphone/webcam in Debian Jessie,
+# Ubuntu 13.04, 14.04 and Arch
+
 # Copyright (C) 2011-2013 Antonio García Domínguez
+# Copyright (C) 2016 C.J. Adams-Collier
 # Licensed under GPLv3
 
 # Usage: ./prepare-videochat.sh [flip method]
@@ -31,8 +34,7 @@
 # 1. Does v4l2loopback work properly?
 #
 # Try running these commands. You'll first need to install mplayer and
-# ensure that your user can write to /dev/video*), and then run these
-# commands on one tab:
+# ensure that your user can write to /dev/video*).
 #
 #  sudo modprobe -r v4l2loopback
 #  ls /dev/video*
@@ -40,11 +42,9 @@
 #  sudo modprobe v4l2loopback
 #  ls /dev/video*
 #  (Note down the new devices: let X be the number of the first new device.)
-#  gst-launch videotestsrc ! v4l2sink device=/dev/videoX
+#  v4l2-ctl -D -d /dev/videoX
+#  gst-launch videotestsrc ! v4l2sink device=/dev/videoX & mplayer -tv device=/dev/videoX tv://
 #
-# Now go to another tab and use mplayer to play it back:
-#
-#  mplayer -tv device=/dev/videoX tv://
 #
 # You should be able to see the GStreamer test video source, which is
 # like a TV test card. Otherwise, there's an issue in your v4l2loopback
@@ -327,6 +327,8 @@ ECANCEL_ID=$(modid_by_sinkname "${SINK_NAME}_echo_cancel")
 if [ -z $SINK_ID ] ; then
     SINK_ID=$(pactl load-module module-null-sink \
                     sink_name="$SINK_NAME" \
+                    format=s16le \
+                    rate=44100 \
                     sink_properties="device.description='IP\ Webcam'")
 fi
 
@@ -335,7 +337,7 @@ if [ -z $ECANCEL_ID ] ; then
                        sink_name="${SINK_NAME}_echo_cancel" \
                        source_master="$SINK_NAME.monitor" \
                        sink_master="$DEFAULT_SINK" \
-                       aec_method="webrtc" save_aec=1 use_volume_sharing=1)
+                       aec_method="webrtc" save_aec=true use_volume_sharing=true)
 fi
 
 pactl set-default-source $SINK_NAME.monitor
@@ -377,11 +379,7 @@ set +e
     ! $VIDEO_CAPS \
     ! v4l2sink device="$DEVICE" sync=true \
   souphttpsrc location="$AUDIO_URL" do-timestamp=true is-live=true \
-    ! wavparse \
-    ! audioconvert \
-    ! audioresample \
-    ! volume volume=3 \
-    ! rglimiter \
+    ! audio/x-raw,format=S16LE,layout=interleaved,rate=44100,channels=1 \
     ! pulsesink device="$SINK_NAME" sync=true \
     2>&1 > feed.log &
 
