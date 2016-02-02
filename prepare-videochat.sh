@@ -342,7 +342,7 @@ if [ -z $ECANCEL_ID ] ; then
                        source_master="$SINK_NAME.monitor" \
                        sink_master="$DEFAULT_SINK" \
                        $PA_AUDIO_CAPS \
-                       aec_method="webrtc" save_aec=true use_volume_sharing=true)
+                       aec_method="webrtc" save_aec=true use_volume_sharing=true) || true
 fi
 
 pactl set-default-source $SINK_NAME.monitor
