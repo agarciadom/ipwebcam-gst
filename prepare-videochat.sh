@@ -265,11 +265,14 @@ if ! has_kernel_module v4l2loopback; then
 fi
 
 # check if the user has the pulse gst plugin installed
-if [ ! -f /usr/lib/*/gstreamer-$GST_VER/libgstpulse.so ]; then
+if find /usr/lib -path "*/gstreamer-$GST_VER/libgstpulse.so" | egrep -q '.*'; then
+    # plugin installed, do nothing
+    info "Found the pulse gst plugin"
+else
     if [ $DIST = "Debian" ] || [ $DIST = "Ubuntu" ]; then
         sudo apt-get install -y gstreamer${GST_VER}-pulseaudio
     elif can_run yaourt; then
-        echo "we should figure out what package supplies this"
+        error "we should figure out what package supplies this"
     fi
 fi
 
@@ -386,7 +389,7 @@ set +e
   souphttpsrc location="$AUDIO_URL" do-timestamp=true is-live=true \
     ! $GST_AUDIO_CAPS \
     ! pulsesink device="$SINK_NAME" sync=true \
-    2>&1 > feed.log &
+    >feed.log 2>&1 &
 
 GSTLAUNCH_PID=$!
 
