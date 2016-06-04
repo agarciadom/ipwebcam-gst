@@ -129,7 +129,15 @@ GST_FPS=5
 ### FUNCTIONS
 
 has_kernel_module() {
-    sudo modprobe -q "$1" > /dev/null 2>&1
+    # Loads module if it is not yet loaded
+    MODULE="$1"
+    if lsmod | grep "$MODULE" &> /dev/null ; then
+        # echo "$MODULE is loaded! Do nothnig."
+        :
+    else
+        echo "Module $MODULE is not loaded. Trying to load it."
+        sudo modprobe -q "$MODULE" > /dev/null 2>&1
+    fi
 }
 
 error() {
@@ -217,7 +225,8 @@ GST_0_10_VIDEO_MIMETYPE=$GST_VIDEO_MIMETYPE
 GST_0_10_VIDEO_FORMAT=$GST_VIDEO_FORMAT
 
 if [ $DIST = "Debian" -a `echo "$RELEASE >= 8.0"   | bc` -eq 1 ] ||\
-   [ $DIST = "Ubuntu" -a `echo "$RELEASE >= 14.04" | bc` -eq 1 ]
+   [ $DIST = "Ubuntu" -a `echo "$RELEASE >= 14.04" | bc` -eq 1 ] ||\
+   [ $DIST = "Arch" ]
 then
     GST_VER="1.0"
     GST_VIDEO_CONVERTER="videoconvert"
@@ -253,8 +262,8 @@ if ! has_kernel_module v4l2loopback; then
         if [ $? != 0 ]; then
             info "Installation failed.  Please install v4l2loopback manually from github.com/umlaeute/v4l2loopback."
         fi
-    elif can_run yaourt; then
-        yaourt -S v4l2loopback-git
+    elif [ $DIST = "Arch" ]; then
+        yaourt -S v4l2loopback-dkms
     fi
 
     if has_kernel_module v4l2loopback; then
@@ -265,7 +274,7 @@ if ! has_kernel_module v4l2loopback; then
 fi
 
 # check if the user has the pulse gst plugin installed
-if find /usr/lib -path "*/gstreamer-$GST_VER/libgstpulse.so" | egrep -q '.*'; then
+if find "/usr/lib/gstreamer-$GST_VER/libgstpulse.so" | egrep -q '.*'; then # lc
     # plugin installed, do nothing
     info "Found the pulse gst plugin"
 else
