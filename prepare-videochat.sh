@@ -29,6 +29,11 @@
 # the last message dialog: that's our GStreamer graph processing the
 # audio and video from IP Webcam.
 #
+# INSTALLATION
+#
+# In Arch Linux
+# install ipwebcam-gst package from AUR
+#
 # TROUBLESHOOTING
 #
 # 1. Does v4l2loopback work properly?
@@ -263,25 +268,25 @@ if ! has_kernel_module v4l2loopback; then
             info "Installation failed.  Please install v4l2loopback manually from github.com/umlaeute/v4l2loopback."
         fi
     elif [ $DIST = "Arch" ]; then
-        yaourt -S v4l2loopback-dkms
+        error "Plesae install v4l2loopback-dkms package (available in AUR)"
     fi
 
     if has_kernel_module v4l2loopback; then
         info "The v4l2loopback kernel module was installed successfully."
     else
-        error "Could not install the v4l2loopback kernel module through apt-get or yaourt."
+        error "Could not install the v4l2loopback kernel module through apt-get."
     fi
 fi
 
 # check if the user has the pulse gst plugin installed
-if find "/usr/lib/gstreamer-$GST_VER/libgstpulse.so" | egrep -q '.*'; then # lc
+if find "/usr/lib/gstreamer-$GST_VER/libgstpulse.so" | egrep -q '.*'; then
     # plugin installed, do nothing
     info "Found the pulse gst plugin"
 else
     if [ $DIST = "Debian" ] || [ $DIST = "Ubuntu" ]; then
         sudo apt-get install -y gstreamer${GST_VER}-pulseaudio
-    elif can_run yaourt; then
-        error "we should figure out what package supplies this"
+    elif [ $DIST = "Arch" ]; then
+        error "Please install gst-plugins-good package"
     fi
 fi
 
@@ -291,8 +296,8 @@ fi
 if ! can_run v4l2-ctl; then
     if can_run apt-get; then
         sudo apt-get install -y v4l-utils
-    elif can_run pacman; then
-        sudo pacman -S v4l-utils
+    elif [ $DIST = "Arch" ]; then
+        error "Please install v4l-utils package"
     fi
 fi
 if can_run v4l2-ctl; then
@@ -362,21 +367,18 @@ pactl set-default-source $SINK_NAME.monitor
 # Check for gst-launch
 GSTLAUNCH=gst-launch-${GST_VER}
 if [ $DIST = "Debian" ]; then
-    # Debian
     if ! can_run "$GSTLAUNCH"; then
         info "You don't have gst-launch. I'll try to install its Debian/Ubuntu package."
         sudo apt-get install -y gstreamer${GST_VER}-tools
     fi
-elif can_run pacman; then
-    # Arch
+elif  [ $DIST = "Arch" ]; then
     if ! can_run "$GSTLAUNCH"; then
-        info "You don't have gst-launch. I'll try to install its Arch package."
-        sudo pacman -S gstreamer${GST_VER} gstreamer${GST_VER}-good-plugins
+        error "You don't have gst-launch. Please install gstreamer and gst-plugins-good packages."
     fi
 fi
 if ! can_run "$GSTLAUNCH"; then
     error "Could not find gst-launch. Exiting."
-    exit 1
+    # exit 1 # you have already exited after error function.
 fi
 
 # Start the GStreamer graph needed to grab the video and audio
