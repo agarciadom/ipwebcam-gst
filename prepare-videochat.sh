@@ -398,7 +398,7 @@ set +e
     ! $GST_VIDEO_CAPS \
     ! v4l2sink device="$DEVICE" sync=true \
   souphttpsrc location="$AUDIO_URL" do-timestamp=true is-live=true \
-    ! $GST_AUDIO_CAPS \
+    ! $GST_AUDIO_CAPS ! queue \
     ! pulsesink device="$SINK_NAME" sync=true \
     >feed.log 2>&1 &
 
