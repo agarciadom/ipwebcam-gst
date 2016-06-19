@@ -32,7 +32,7 @@
 # INSTALLATION
 #
 # In Arch Linux
-# install ipwebcam-gst package from AUR
+# install ipwebcam-gst-git package from AUR
 #
 # TROUBLESHOOTING
 #
@@ -59,11 +59,18 @@
 #
 # To make sure the video from IP Webcam works for you (except for
 # v4l2loopback and your video conference software), try this command
-# with a simplified pipeline:
+# with a simplified pipeline (do not forget to replace $IP and $PORT
+# with your values):
 #
+# on Debian:
 #   gst-launch souphttpsrc location="http://$IP:$PORT/videofeed" \
 #               do-timestamp=true is-live=true \
 #    ! multipartdemux ! jpegdec ! ffmpegcolorspace ! ximagesink
+#
+# on Arch Linux:
+#   gst-launch-1.0 souphttpsrc location="http://$IP:$PORT/videofeed" \
+#               do-timestamp=true is-live=true \
+#    ! multipartdemux ! jpegdec ! videoconvert ! ximagesink
 #
 # You should be able to see the picture from your webcam on a new window.
 # If that doesn't work, there's something wrong with your connection to
@@ -130,6 +137,8 @@ HEIGHT=480
 # Frame rate of video
 GST_FPS=5
 
+# Choose audio codec from wav, aac or opus
+AUDIO_CODEC=opus
 
 ### FUNCTIONS
 
@@ -330,7 +339,7 @@ fi
 # Remind the user to open up IP Webcam and start the server
 BASE_URL=http://$IP:$PORT
 VIDEO_URL=$BASE_URL/videofeed
-AUDIO_URL=$BASE_URL/audio.wav
+AUDIO_URL=$BASE_URL/audio.$AUDIO_CODEC
 if phone_plugged && ! iw_server_is_started; then
     # If the phone is plugged to USB and we have ADB, we can start the server by sending an intent
     start_iw_server
