@@ -145,7 +145,7 @@ AUDIO_CODEC=opus
 has_kernel_module() {
     # Loads module if it is not yet loaded
     MODULE="$1"
-    if lsmod | grep "$MODULE" &> /dev/null ; then
+    if lsmod | grep "$MODULE" >/dev/null 2>/dev/null; then
         # echo "$MODULE is loaded! Do nothnig."
         :
     else
