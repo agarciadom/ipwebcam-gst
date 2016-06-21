@@ -173,7 +173,7 @@ confirm() {
 
 can_run() {
     # It's either the path to a file, or the name of an executable in $PATH
-    (test -x "$1" || which "$1") &>/dev/null
+    which "$1" >/dev/null 2>/dev/null
 }
 
 start_adb() {
