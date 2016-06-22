@@ -146,13 +146,8 @@ has_kernel_module() {
     # Checks if module exists in system (but do not loads it)
     MODULE="$1"
     if lsmod | grep "$MODULE" >/dev/null 2>/dev/null; then
-<<<<<<< HEAD
         # echo "$MODULE is loaded! So it exists."
         return 0
-=======
-        # echo "$MODULE is loaded! Do nothnig."
-        :
->>>>>>> bluezio-rep/master
     else
        # Determining kernel object existence
        # I do not know why, but using -q in egrep makes it always return 1, so do not use it
@@ -185,18 +180,15 @@ confirm() {
 can_run() {
     # It's either the path to a file, or the name of an executable in $PATH
     which "$1" >/dev/null 2>/dev/null
-<<<<<<< HEAD
 }
 
 install_package() {
-    if can_run apt-get; then
+    if [ $DIST = "Debian" ] || [ $DIST = "Ubuntu" ] || [ $DIST = "LinuxMint" ]; then
         echo "Trying to install $1 package."
         sudo apt-get install -y "$1"
     elif [ $DIST = "Arch" ]; then
         error "Please install $1 package"
     fi
-=======
->>>>>>> bluezio-rep/master
 }
 
 start_adb() {
@@ -312,8 +304,14 @@ if ! has_kernel_module v4l2loopback; then
     fi
 fi
 
-echo Loading module
+# Probe module if not probed yet
+if lsmod | grep v4l2loopback >/dev/null 2>/dev/null; then
+    # module is already loaded, do nothing
+    :
+else
+    echo Loading module
     sudo modprobe v4l2loopback #-q > /dev/null 2>&1
+fi
 
 # check if the user has the pulse gst plugin installed
 if find "/usr/lib/gstreamer-$GST_VER/libgstpulse.so" "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstpulse.so" | egrep -q '.*'; then
