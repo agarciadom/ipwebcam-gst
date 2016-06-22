@@ -143,15 +143,21 @@ AUDIO_CODEC=opus
 ### FUNCTIONS
 
 has_kernel_module() {
-    # Loads module if it is not yet loaded
+    # Checks if module exists in system (but do not loads it)
     MODULE="$1"
-    if lsmod | grep "$MODULE" &> /dev/null ; then
-        # echo "$MODULE is loaded! Do nothnig."
-        :
+    if lsmod | grep "$MODULE" >/dev/null 2>/dev/null; then
+        # echo "$MODULE is loaded! So it exists."
+        return 0
     else
-        echo "Module $MODULE is not loaded. Trying to load it."
-        sudo modprobe -q "$MODULE" > /dev/null 2>&1
+       # Determining kernel object existence
+       # I do not know why, but using -q in egrep makes it always return 1, so do not use it
+       if [ `find /lib/modules/$(uname -r)/ -name "$MODULE.ko" | egrep '.*'` ]; then
+        return 0
+       else
+        return 1
+       fi
     fi
+
 }
 
 error() {
@@ -173,7 +179,16 @@ confirm() {
 
 can_run() {
     # It's either the path to a file, or the name of an executable in $PATH
-    (test -x "$1" || which "$1") &>/dev/null
+    which "$1" >/dev/null 2>/dev/null
+}
+
+install_package() {
+    if can_run apt-get; then
+        echo "Trying to install $1 package."
+        sudo apt-get install -y "$1"
+    elif [ $DIST = "Arch" ]; then
+        error "Please install $1 package"
+    fi
 }
 
 start_adb() {
@@ -264,20 +279,22 @@ GST_DEBUG=souphttpsrc:0,videoflip:0,$GST_CONVERTER:0,v4l2sink:0,pulse:0
 
 ### MAIN BODY
 
+
+if ! can_run zenity; then
+    install_package zenity
+fi
+
 # Check if the user has v4l2loopback
 if ! has_kernel_module v4l2loopback; then
-    info "The v4l2loopback kernel module is not installed or could not be loaded. Attempting to install the kernel module using your distro's package manager."
-    if [ $DIST = "Debian" ] || [ $DIST = "Ubuntu" ]; then
-        V4L2LOOPBACK_PKGS="v4l2loopback-dkms"
+    if [ $DIST = "Debian" ] || [ $DIST = "Ubuntu" ] || [ $DIST = "Arch" ]; then
+        install_package "v4l2loopback-dkms"
         if [ $DIST = "Ubuntu" ]; then
-           V4L2LOOPBACK_PKGS="${V4L2LOOPBACK_PKGS} python-apport"
+           install_package "python-apport"
         fi
-        sudo apt-get -y install $V4L2LOOPBACK_PKGS
+
         if [ $? != 0 ]; then
             info "Installation failed.  Please install v4l2loopback manually from github.com/umlaeute/v4l2loopback."
         fi
-    elif [ $DIST = "Arch" ]; then
-        error "Plesae install v4l2loopback-dkms package (available in AUR)"
     fi
 
     if has_kernel_module v4l2loopback; then
@@ -287,15 +304,18 @@ if ! has_kernel_module v4l2loopback; then
     fi
 fi
 
+echo Loading module
+    sudo modprobe v4l2loopback #-q > /dev/null 2>&1
+
 # check if the user has the pulse gst plugin installed
-if find "/usr/lib/gstreamer-$GST_VER/libgstpulse.so" | egrep -q '.*'; then
+if find "/usr/lib/gstreamer-$GST_VER/libgstpulse.so" "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstpulse.so" | egrep -q '.*'; then
     # plugin installed, do nothing
     info "Found the pulse gst plugin"
 else
     if [ $DIST = "Debian" ] || [ $DIST = "Ubuntu" ]; then
-        sudo apt-get install -y gstreamer${GST_VER}-pulseaudio
+        install_package "gstreamer${GST_VER}-pulseaudio"
     elif [ $DIST = "Arch" ]; then
-        error "Please install gst-plugins-good package"
+        install_package "gst-plugins-good"
     fi
 fi
 
@@ -303,11 +323,7 @@ fi
 # when loading v4l2loopback on a system that already has a regular
 # webcam.
 if ! can_run v4l2-ctl; then
-    if can_run apt-get; then
-        sudo apt-get install -y v4l-utils
-    elif [ $DIST = "Arch" ]; then
-        error "Please install v4l-utils package"
-    fi
+    install_package v4l-utils
 fi
 if can_run v4l2-ctl; then
     for d in /dev/video*; do
@@ -325,9 +341,9 @@ fi
 # Decide whether to connect through USB or through wi-fi
 IP=$WIFI_IP
 if ! can_run "$ADB"; then
-    warning "adb is not available: you'll have to use Wi-Fi, which will be slower. Next time, please install the Android SDK from developer.android.com/sdk."
+    warning "adb is not available: you'll have to use Wi-Fi, which will be slower. Next time, please install the Android SDK from developer.android.com/sdk or install adb package in Ubuntu"
 else
-    while ! phone_plugged && ! confirm "adb is available, but the phone is not plugged in. Are you sure you want to use Wi-Fi (slower)? If you don't, please connect your phone to USB."; do
+    while ! phone_plugged && ! confirm "adb is available, but the phone is not plugged in. Are you sure you want to use Wi-Fi (slower)? If you don't, please connect your phone to USB and allow usb debugging under developer settings."; do
         true
     done
     if phone_plugged; then
@@ -345,7 +361,7 @@ if phone_plugged && ! iw_server_is_started; then
     start_iw_server
 fi
 while ! iw_server_is_started; do
-    info "The IP Webcam video feed is not reachable at $VIDEO_URL. Please open IP Webcam in your phone and start the server."
+    info "The IP Webcam video feed is not reachable at $VIDEO_URL. Please install and open IP Webcam in your phone and start the server."
 done
 
 DEFAULT_SINK=$(pacmd dump | mawk '/set-default-sink/ {print $2}')
@@ -375,10 +391,9 @@ pactl set-default-source $SINK_NAME.monitor
 
 # Check for gst-launch
 GSTLAUNCH=gst-launch-${GST_VER}
-if [ $DIST = "Debian" ]; then
+if [ $DIST = "Debian" ] || [ $DIST = "Ubuntu" ]; then
     if ! can_run "$GSTLAUNCH"; then
-        info "You don't have gst-launch. I'll try to install its Debian/Ubuntu package."
-        sudo apt-get install -y gstreamer${GST_VER}-tools
+        install_package gstreamer${GST_VER}-tools
     fi
 elif  [ $DIST = "Arch" ]; then
     if ! can_run "$GSTLAUNCH"; then
