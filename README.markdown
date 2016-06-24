@@ -17,8 +17,7 @@ Please make sure that audio is enabled on IP Webcam, or the script won't work!
 
 Ideas for future work:
 * switch to Python and use the official GStreamer binding. I'd love to see that, but I don't have enough free time :-(.
-* make a separated config file (system-wide and user-defind)
-* make another file (ex. prepare-mic) for preparing audio without video or allow it via config
+* make a separated config file (system-wide and user-defined)
 
 Disclaimer: the script has only been tested in my local installation of Ubuntu 13.04 and on Arch Linux. I think it should work on most recent Debian-based distributions as well (and Debian, of course). If you need any help, please create an issue on this project.
 
