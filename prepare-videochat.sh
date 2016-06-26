@@ -212,10 +212,6 @@ start_adb() {
     can_run "$ADB" && "$ADB" $ADB_FLAGS start-server
 }
 
-stop_adb() {
-    can_run "$ADB" && "$ADB" $ADB_FLAGS kill-server
-}
-
 phone_plugged() {
     test "$("$ADB" $ADB_FLAGS get-state)" = "device"
 }
@@ -353,7 +349,7 @@ elif [ $CAPTURE_STREAM = v -o $CAPTURE_STREAM = av ]; then
 fi
 
 # check if the user has the pulse gst plugin installed
-if find "/usr/lib/gstreamer-$GST_VER/libgstpulse.so" "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstpulse.so" 2>/dev/null | egrep -q '.*'; then
+if find "/usr/lib/gstreamer-$GST_VER/libgstpulse.so" "/usr/lib/$(uname -m)-linux-gnu/gstreamer-$GST_VER/libgstpulse.so" 2>/dev/null | egrep -q '.*'; then
     # plugin installed, do nothing
     # info "Found the pulse gst plugin"
     :
@@ -531,7 +527,6 @@ echo "Press enter to end stream"
 perl -e '<STDIN>'
 
 kill $GSTLAUNCH_PID > /dev/null 2>&1 || echo ""
-stop_adb
 pactl set-default-source ${DEFAULT_SOURCE}
 pactl unload-module ${ECANCEL_ID}
 pactl unload-module ${SINK_ID}
