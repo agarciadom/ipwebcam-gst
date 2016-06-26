@@ -160,7 +160,7 @@ CAPTURE_STREAM=av
 ### FUNCTIONS
 
 has_kernel_module() {
-    # Checks if module exists in system (but do not loads it)
+    # Checks if module exists in system (but does not load it)
     MODULE="$1"
     if lsmod | grep "$MODULE" >/dev/null 2>/dev/null; then
         # echo "$MODULE is loaded! So it exists."
