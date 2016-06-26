@@ -1,10 +1,11 @@
 #!/bin/bash
 
 # Script for using IP Webcam as a microphone/webcam in Debian Jessie,
-# Ubuntu 13.04, 14.04 and Arch
+# Ubuntu 13.04, 14.04, 16.04 and Arch Linux
 
 # Copyright (C) 2011-2013 Antonio García Domínguez
 # Copyright (C) 2016 C.J. Adams-Collier
+# Copyright (C) 2016 Laptander
 # Licensed under GPLv3
 
 # Usage: ./prepare-videochat.sh [flip method]
@@ -24,10 +25,15 @@
 # particular, those which change the picture size, such as clockwise
 # or counterclockwise. *-flip and rotate-180 do work, though.
 #
-# IMPORTANT: make sure that audio is enabled on IP Webcam, or the script
-# will not work! If it works, it should stay open after clicking OK on
-# the last message dialog: that's our GStreamer graph processing the
-# audio and video from IP Webcam.
+# To be able to use audio from your phone as a virtual microphone, open pavucontrol,
+# then open Playback tab and choose 'IP Webcam' for gst-launch-1.0 playback Stream.
+# Then to use audio stream in Audacity, open it and press record button or click on
+# the Recording Meter Toolbar to start monitoring, then go to pavucontrol's Recording tab
+# and choose "Monitor of IP Webcam" for ALSA plug-in [audacity].
+# If you want to be able to hear other applications sounds, for example from web-browser,
+# then while it is playing some sound, go to pavucontrol's Playback tab and choose your
+# default sound card for web-browser.
+
 #
 # INSTALLATION
 #
@@ -123,6 +129,9 @@ fi
 # Flags for ADB.
 ADB_FLAGS=
 #ADB_FLAGS="$ADB_FLAGS -s deviceid" # use when you need to pick from several devices (check deviceid in 'adb devices')
+
+# idea: make ability to choose IP version (usefull for IPv6-only environment)
+# IP_VERSION=4
 
 # IP used by the phone in your wireless network
 WIFI_IP=192.168.2.140
@@ -260,8 +269,8 @@ module_id_by_sourcename() {
 
 
 if can_run lsb_release; then
-    DIST=`lsb_release -i | awk -F: '{print $2}'`
-    RELEASE=`lsb_release -r | awk -F: '{print $2}'`
+    DIST=`lsb_release -i | cut -f2 -d ":"`
+    RELEASE=`lsb_release -r | cut -f2 -d ":"`
 elif [ -f /etc/debian_version ] ; then
     DIST="Debian"
     RELEASE=`perl -ne 'chomp; if(m:(jessie|testing|sid):){print "8.0"}elsif(m:[\d\.]+:){print}else{print "0.0"}' < /etc/debian_version`
@@ -338,7 +347,7 @@ fi
 if lsmod | grep v4l2loopback >/dev/null 2>/dev/null; then
     # module is already loaded, do nothing
     :
-else
+elif [ $CAPTURE_STREAM = v -o $CAPTURE_STREAM = av ]; then
     echo Loading module
     sudo modprobe v4l2loopback #-q > /dev/null 2>&1
 fi
@@ -418,13 +427,12 @@ while ! iw_server_is_started; do
     info "$MESSAGE\nPlease install and open IP Webcam in your phone and start the server.\nMake sure that values of variables IP, PORT, CAPTURE_STREAM in this script are equal with settings in IP Webcam."
 done
 
-# maybe replace mawk with core utilities to avoid additional dependency
 # idea: check if default-source is correct. If two copy of script are running,
 # then after ending first before second you will be set up with $SINK_NAME.monitor,
 # but not with your original defauld source.
 # The same issue if script was not end correctly, and you restart it.
-DEFAULT_SINK=$(pacmd dump | mawk '/set-default-sink/ {print $2}')
-DEFAULT_SOURCE=$(pacmd dump | mawk '/set-default-source/ {print $2}')
+DEFAULT_SINK=$(pacmd dump | grep set-default-sink | cut -f2 -d " ")
+DEFAULT_SOURCE=$(pacmd dump | grep set-default-source | cut -f2 -d " ")
 
 SINK_NAME="ipwebcam"
 SINK_ID=$(module_id_by_sinkname $SINK_NAME)
