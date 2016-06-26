@@ -9,11 +9,11 @@ This is a shell script which allows Android users to use their phones as a webca
 * Most videochat software in Linux is compatible with `v4l2loopback`: Skype 2.1 (*not* the latest 2.2, it seems), Cheese, Empathy, Google Talk video chats and Google+ hangouts should work.
 * The sound recording device for your videochat application should be changed to the 'Monitor of Null Sink' using `pavucontrol`.
 
-This project includes `prepare-videochat.sh`, which does all these things, except for switching the recording device for your videochat application. It does open `pavucontrol` if it's not running, though. The script installs `v4l2loopback`, the GStreamer tools and the "good" plugins and `pavucontrol` if required, but you will have to install the [Android SDK](http://developer.android.com/sdk) by yourself.
+This project includes `prepare-videochat.sh`, which does all these things, except for switching the recording device for your videochat application. The script installs `v4l2loopback`, the GStreamer tools and the "good" plugins and `pavucontrol` if required, but you will have to install the [Android SDK](http://developer.android.com/sdk) by yourself.
 
 To use this script, simply run it with `./prepare-videochat.sh` and follow instructions. You may have to customize a few variables in the CONFIGURATION section before using it, though. You can also use something like `./prepare-videochat.sh horizontal-flip` to flip the video horizontally, in case you might need it.
 
-Please make sure that audio is enabled on IP Webcam, or the script won't work!
+You can choose what streams you want to recieve: audio, video or audio with video. It can be choosen using CAPTURE_STREAM variable. Make sure, that IP webcam is streaming corresponding streams, otherwise the script won't work!
 
 Ideas for future work:
 * switch to Python and use the official GStreamer binding. I'd love to see that, but I don't have enough free time :-(.
