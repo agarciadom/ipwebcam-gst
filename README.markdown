@@ -13,7 +13,7 @@ This project includes `prepare-videochat.sh`, which does all these things, excep
 
 To use this script, simply run it with `./prepare-videochat.sh` and follow instructions. You may have to customize a few variables in the CONFIGURATION section before using it, though. You can also use something like `./prepare-videochat.sh horizontal-flip` to flip the video horizontally, in case you might need it.
 
-You can choose what streams you want to recieve: audio, video or audio with video. It can be choosen using CAPTURE_STREAM variable. Make sure, that IP webcam is streaming corresponding streams, otherwise the script won't work!
+You can choose which streams you want to recieve: audio, video or audio with video. This can be chosen using the `CAPTURE_STREAM` variable. Make sure that IP Webcam is streaming the corresponding streams: otherwise, the script won't work!
 
 Ideas for future work:
 * switch to Python and use the official GStreamer binding. I'd love to see that, but I don't have enough free time :-(.
