@@ -3,7 +3,7 @@
 # Script for using IP Webcam as a microphone/webcam in Debian Jessie,
 # Ubuntu 13.04, 14.04, 16.04 and Arch Linux
 
-# Copyright (C) 2011-2013 Antonio García Domínguez
+# Copyright (C) 2011-2016 Antonio García Domínguez
 # Copyright (C) 2016 C.J. Adams-Collier
 # Copyright (C) 2016 Laptander
 # Licensed under GPLv3
@@ -39,6 +39,21 @@
 #
 # In Arch Linux
 # install ipwebcam-gst-git package from AUR
+#
+# MULTIPLE WEBCAMS
+#
+# This requires some extra work. First, you need to reload the
+# v4l2loopback module yourself and specify how many loopback devices
+# you want (default is 1). For instance, if you want 2:
+#
+#   sudo modprobe -r v4l2loopback
+#   sudo modprobe v4l2loopback devices=2
+#
+# Next, run two copies of this script with explicit WIFI_IP and DEVICE
+# settings (see CONFIGURATION):
+#
+#   ./prepare-videochat.sh
+#   ./prepare-videochat-copy.sh
 #
 # TROUBLESHOOTING
 #
@@ -156,6 +171,10 @@ AUDIO_CODEC=wav
 #  a - audio only, v - video only, av - audio and video.
 # Make sure that IP webcam is streaming corresponding streams, otherwise error will occur.
 CAPTURE_STREAM=av
+
+# Loopback device to be used. This only needs to be uncommented if you
+# want to skip autodetection (e.g. for multiple webcams):
+#DEVICE=/dev/video0
 
 ### FUNCTIONS
 
@@ -361,23 +380,26 @@ else
     fi
 fi
 
-# Use the first "v4l2 loopback" device as the webcam: this should help
-# when loading v4l2loopback on a system that already has a regular
-# webcam.
+# If the user hasn't manually specified which /dev/video* to use
+# through DEVICE, use the first "v4l2 loopback" device as the webcam:
+# this should help when loading v4l2loopback on a system that already
+# has a regular webcam. If that doesn't work, fall back to /dev/video0.
 if ! can_run v4l2-ctl; then
     install_package v4l-utils
 fi
-if can_run v4l2-ctl; then
-    for d in /dev/video*; do
-        if v4l2-ctl -d "$d" -D | grep -q "v4l2 loopback"; then
-            DEVICE=$d
-            break
-        fi
-    done
-fi
 if [ -z "$DEVICE" ]; then
-    DEVICE=/dev/video0
-    warning "Could not find the v4l2loopback device: falling back to $DEVICE"
+    if can_run v4l2-ctl; then
+	for d in /dev/video*; do
+            if v4l2-ctl -d "$d" -D | grep -q "v4l2 loopback"; then
+		DEVICE=$d
+		break
+            fi
+	done
+    fi
+    if [ -z "$DEVICE" ]; then
+	DEVICE=/dev/video0
+	warning "Could not find the v4l2loopback device: falling back to $DEVICE"
+    fi
 fi
 
 # Decide whether to connect through USB or through wi-fi
