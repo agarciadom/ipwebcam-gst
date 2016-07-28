@@ -181,7 +181,7 @@ CAPTURE_STREAM=av
 has_kernel_module() {
     # Checks if module exists in system (but does not load it)
     MODULE="$1"
-    if lsmod | grep "$MODULE" >/dev/null 2>/dev/null; then
+    if lsmod | grep -w "$MODULE" >/dev/null 2>/dev/null; then
         # echo "$MODULE is loaded! So it exists."
         return 0
     else
@@ -359,7 +359,7 @@ if ! has_kernel_module v4l2loopback; then
 fi
 
 # Probe module if not probed yet
-if lsmod | grep v4l2loopback >/dev/null 2>/dev/null; then
+if lsmod | grep -w v4l2loopback >/dev/null 2>/dev/null; then
     # module is already loaded, do nothing
     :
 elif [ $CAPTURE_STREAM = v -o $CAPTURE_STREAM = av ]; then
