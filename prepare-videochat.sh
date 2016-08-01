@@ -245,11 +245,12 @@ url_reachable() {
         # has it in its core, so we don't need to check that case)
         sudo apt-get install -y curl
     fi
+
+    CURL_OPTIONS=""
     if [ $DISABLE_PROXY = 1 ]; then
-        curl --noproxy '*' -m 5 -sI "$1" >/dev/null
-    else
-        curl -m 5 -sI "$1" >/dev/null
+        CURL_OPTIONS="--noproxy $WIFI_IP"
     fi
+    curl $CURL_OPTIONS -m 5 -sI "$1" >/dev/null
 }
 
 send_intent() {
@@ -536,7 +537,6 @@ fi
 
 if [ $DISABLE_PROXY = 1 ]; then
     # Disabling proxy to access WIFI_IP viz. on local network
-    temp_http_proxy=$http_proxy
     unset http_proxy
 fi
 
@@ -566,11 +566,6 @@ kill $GSTLAUNCH_PID > /dev/null 2>&1 || echo ""
 pactl set-default-source ${DEFAULT_SOURCE}
 pactl unload-module ${ECANCEL_ID}
 pactl unload-module ${SINK_ID}
-
-if [ $DISABLE_PROXY = 1 ]; then
-    # Renabling proxy on completion of the script
-    export http_proxy=$temp_http_proxy
-fi
 
 echo "Disconnected from IP Webcam. Have a nice day!"
 # idea: capture ctrl-c signal and set default source back
