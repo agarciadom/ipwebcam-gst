@@ -154,6 +154,10 @@ WIFI_IP=192.168.2.140
 # Port on which IP Webcam is listening
 PORT=8080
 
+# To disable proxy while acessing WIFI_IP (set value 1 to disable, 0 for not)
+# For cases when host m/c is connected to a Proxy-Server and WIFI_IP belongs to local network
+DISABLE_PROXY=0
+
 # Dimensions of video
 WIDTH=640
 HEIGHT=480
@@ -241,7 +245,12 @@ url_reachable() {
         # has it in its core, so we don't need to check that case)
         sudo apt-get install -y curl
     fi
-    curl -m 5 -sI "$1" >/dev/null
+
+    CURL_OPTIONS=""
+    if [ $DISABLE_PROXY = 1 ]; then
+        CURL_OPTIONS="--noproxy $WIFI_IP"
+    fi
+    curl $CURL_OPTIONS -m 5 -sI "$1" >/dev/null
 }
 
 send_intent() {
@@ -525,6 +534,11 @@ else
 fi
 
 # echo "$PIPELINE"
+
+if [ $DISABLE_PROXY = 1 ]; then
+    # Disabling proxy to access WIFI_IP viz. on local network
+    unset http_proxy
+fi
 
 "$GSTLAUNCH" -e -vt --gst-plugin-spew \
              --gst-debug="$GST_DEBUG" \
