@@ -303,7 +303,7 @@ fi
 GST_VER="0.10"
 GST_VIDEO_CONVERTER="ffmpegcolorspace"
 GST_VIDEO_MIMETYPE="video/x-raw-yuv"
-GST_VIDEO_FORMAT="format=(fourcc)YV12"
+GST_VIDEO_FORMAT="format=(fourcc)YUY2"
 
 GST_AUDIO_MIMETYPE="audio/x-raw-int"
 GST_AUDIO_FORMAT="width=16,depth=16,endianness=1234,signed=true"
@@ -322,7 +322,7 @@ then
     GST_VER="1.0"
     GST_VIDEO_CONVERTER="videoconvert"
     GST_VIDEO_MIMETYPE="video/x-raw"
-    GST_VIDEO_FORMAT="format=YV12"
+    GST_VIDEO_FORMAT="format=YUY2"
 
     GST_AUDIO_MIMETYPE="audio/x-raw"
     GST_AUDIO_FORMAT=$GST_1_0_AUDIO_FORMAT
