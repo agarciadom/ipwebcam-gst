@@ -317,6 +317,7 @@ GST_0_10_VIDEO_FORMAT=$GST_VIDEO_FORMAT
 
 if [ $DIST = "Debian" -a `echo "$RELEASE >= 8.0"   | bc` -eq 1 ] ||\
    [ $DIST = "Ubuntu" -a `echo "$RELEASE >= 14.04" | bc` -eq 1 ] ||\
+   [ $DIST = "LinuxMint" -a `echo "$RELEASE >= 14.04" | bc` -eq 1 ] ||\
    [ $DIST = "Arch" ]
 then
     GST_VER="1.0"
