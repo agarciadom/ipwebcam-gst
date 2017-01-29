@@ -295,6 +295,9 @@ module_id_by_sourcename() {
 if can_run lsb_release; then
     DIST=`lsb_release -i | cut -f2 -d ":"`
     RELEASE=`lsb_release -r | cut -f2 -d ":"`
+elif [ -f "/etc/arch-release" ]; then
+    DIST="Arch"
+    RELASE=""
 elif [ -f /etc/debian_version ] ; then
     DIST="Debian"
     RELEASE=`perl -ne 'chomp; if(m:(jessie|testing|sid):){print "8.0"}elsif(m:[\d\.]+:){print}else{print "0.0"}' < /etc/debian_version`
@@ -315,9 +318,9 @@ GST_1_0_AUDIO_FORMAT="format=S16LE"
 GST_0_10_VIDEO_MIMETYPE=$GST_VIDEO_MIMETYPE
 GST_0_10_VIDEO_FORMAT=$GST_VIDEO_FORMAT
 
-if [ $DIST = "Debian" -a `echo "$RELEASE >= 8.0"   | bc` -eq 1 ] ||\
-   [ $DIST = "Ubuntu" -a `echo "$RELEASE >= 14.04" | bc` -eq 1 ] ||\
-   [ $DIST = "LinuxMint" -a `echo "$RELEASE >= 14.04" | bc` -eq 1 ] ||\
+if [ $DIST = "Debian" ] && [ `echo "$RELEASE >= 8.0"   | bc` -eq 1 ] ||\
+   [ $DIST = "Ubuntu" ] && [ `echo "$RELEASE >= 14.04" | bc` -eq 1 ] ||\
+   [ $DIST = "LinuxMint" ] && [ `echo "$RELEASE >= 14.04" | bc` -eq 1 ] ||\
    [ $DIST = "Arch" ]
 then
     GST_VER="1.0"
