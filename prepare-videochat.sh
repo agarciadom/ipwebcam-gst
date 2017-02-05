@@ -318,6 +318,10 @@ GST_1_0_AUDIO_FORMAT="format=S16LE"
 GST_0_10_VIDEO_MIMETYPE=$GST_VIDEO_MIMETYPE
 GST_0_10_VIDEO_FORMAT=$GST_VIDEO_FORMAT
 
+if ! can_run bc; then
+    install_package bc
+fi
+
 if [ $DIST = "Debian" ] && [ `echo "$RELEASE >= 8.0"   | bc` -eq 1 ] ||\
    [ $DIST = "Ubuntu" ] && [ `echo "$RELEASE >= 14.04" | bc` -eq 1 ] ||\
    [ $DIST = "LinuxMint" ] && [ `echo "$RELEASE >= 14.04" | bc` -eq 1 ] ||\
