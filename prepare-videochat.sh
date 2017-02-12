@@ -297,7 +297,7 @@ if can_run lsb_release; then
     RELEASE=`lsb_release -r | cut -f2 -d ":"`
 elif [ -f "/etc/arch-release" ]; then
     DIST="Arch"
-    RELASE=""
+    RELEASE=""
 elif [ -f /etc/debian_version ] ; then
     DIST="Debian"
     RELEASE=`perl -ne 'chomp; if(m:(jessie|testing|sid):){print "8.0"}elsif(m:[\d\.]+:){print}else{print "0.0"}' < /etc/debian_version`
