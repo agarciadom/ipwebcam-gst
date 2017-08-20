@@ -385,7 +385,7 @@ elif [ $CAPTURE_STREAM = v -o $CAPTURE_STREAM = av ]; then
 fi
 
 # check if the user has the pulse gst plugin installed
-if find "/usr/lib/gstreamer-$GST_VER/libgstpulse.so" "/usr/lib/$(uname -m)-linux-gnu/gstreamer-$GST_VER/libgstpulse.so" 2>/dev/null | egrep -q '.*'; then
+if find "/usr/lib/gstreamer-$GST_VER/libgstpulseaudio.so" "/usr/lib/gstreamer-$GST_VER/libgstpulse.so" "/usr/lib/$(uname -m)-linux-gnu/gstreamer-$GST_VER/libgstpulse.so" 2>/dev/null | egrep -q '.*'; then
     # plugin installed, do nothing
     # info "Found the pulse gst plugin"
     :
