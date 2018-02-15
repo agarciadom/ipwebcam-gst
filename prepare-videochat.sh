@@ -69,7 +69,7 @@
 #  ls /dev/video*
 #  (Note down the new devices: let X be the number of the first new device.)
 #  v4l2-ctl -D -d /dev/videoX
-#  gst-launch videotestsrc ! v4l2sink device=/dev/videoX & mplayer -tv device=/dev/videoX tv://
+#  gst-launch-1.0 videotestsrc ! v4l2sink device=/dev/videoX & mplayer -tv device=/dev/videoX tv://
 #
 #
 # You should be able to see the GStreamer test video source, which is
@@ -84,7 +84,7 @@
 # with your values):
 #
 # on Debian:
-#   gst-launch souphttpsrc location="http://$IP:$PORT/videofeed" \
+#   gst-launch-1.0 souphttpsrc location="http://$IP:$PORT/videofeed" \
 #               do-timestamp=true is-live=true \
 #    ! multipartdemux ! jpegdec ! ffmpegcolorspace ! ximagesink
 #
