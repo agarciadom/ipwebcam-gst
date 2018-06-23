@@ -200,6 +200,21 @@ has_kernel_module() {
 
 }
 
+check_os_version() {
+    # checks if the OS version can use newer GStreamer version
+    DIST="$1"
+    RELEASE="$2"
+
+    case "$DIST" in
+        "Debian")       return "`echo "$RELEASE < 8.0"   | bc`" ;;
+        "Ubuntu")       return "`echo "$RELEASE < 14.04" | bc`" ;;
+        "LinuxMint")    return "`echo "$RELEASE < 14.04" | bc`" ;;
+        "Arch")         return 0 ;;
+    esac
+    # assume other Distributions are also new enough, by now
+    return 0
+}
+
 error() {
     zenity --error --text "$@" > /dev/null 2>&1
     exit 1
@@ -322,10 +337,10 @@ if ! can_run bc; then
     install_package bc
 fi
 
-if [ $DIST = "Debian" ] && [ `echo "$RELEASE >= 8.0"   | bc` -eq 1 ] ||\
-   [ $DIST = "Ubuntu" ] && [ `echo "$RELEASE >= 14.04" | bc` -eq 1 ] ||\
-   [ $DIST = "LinuxMint" ] && [ `echo "$RELEASE >= 14.04" | bc` -eq 1 ] ||\
-   [ $DIST = "Arch" ]
+set +e
+check_os_version $DIST $RELEASE
+set -e
+if [ $? -eq 0 ]
 then
     GST_VER="1.0"
     GST_VIDEO_CONVERTER="videoconvert"
