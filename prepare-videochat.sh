@@ -163,7 +163,7 @@ WIDTH=640
 HEIGHT=480
 
 # Frame rate of video
-GST_FPS=5
+GST_FPS=24
 
 # Choose audio codec from wav, aac or opus
 # do not choose opus until editing pipeline. If choose opus, pipeline will not work
@@ -531,7 +531,7 @@ set +e
 pipeline_video() {
   echo souphttpsrc location="$VIDEO_URL" do-timestamp=true is-live=true \
     ! multipartdemux \
-    ! jpegdec \
+    ! decodebin \
     $GST_FLIP \
     ! $GST_VIDEO_CONVERTER \
     ! videoscale \
