@@ -180,6 +180,11 @@ CAPTURE_STREAM=av
 # want to skip autodetection (e.g. for multiple webcams):
 #DEVICE=/dev/video0
 
+# Force syncing to timestamps. Useful to keep audio and video in sync,
+# but may impact performance in slow connections. If you see errors about
+# timestamping or you do not need audio, you can try changing this to false.
+SYNC=true
+
 ### FUNCTIONS
 
 has_kernel_module() {
@@ -537,13 +542,13 @@ pipeline_video() {
     ! videoscale \
     ! videorate \
     ! $GST_VIDEO_CAPS \
-    ! v4l2sink device="$DEVICE" sync=true
+    ! v4l2sink device="$DEVICE" sync=$SYNC
 }
 
 pipeline_audio() {
   echo souphttpsrc location="$AUDIO_URL" do-timestamp=true is-live=true \
     ! $GST_AUDIO_CAPS ! queue \
-    ! pulsesink device="$SINK_NAME" sync=true
+    ! pulsesink device="$SINK_NAME" sync=$SYNC
 }
 
 if [ $CAPTURE_STREAM = av ]; then
