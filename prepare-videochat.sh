@@ -449,8 +449,12 @@ else
         sleep 1;
     done
     if phone_plugged; then
-        "$ADB" $ADB_FLAGS forward tcp:$PORT tcp:$PORT
-        IP=127.0.0.1
+        if ss -ln src :$PORT | grep -q :$PORT; then
+            warning "Your port $PORT seems to be in use: falling back to Wi-Fi. If you would like to use USB forwarding, please free it up and try again."
+        else
+            "$ADB" $ADB_FLAGS forward tcp:$PORT tcp:$PORT
+            IP=127.0.0.1
+        fi
     fi
 fi
 
