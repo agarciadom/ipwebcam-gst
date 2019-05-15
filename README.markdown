@@ -22,5 +22,3 @@ Ideas for future work:
 Disclaimer: the script has only been tested in my local installation of Ubuntu 13.04 and on Arch Linux. I think it should work on most recent Debian-based distributions as well (and Debian, of course). If you need any help, please create an issue on this project.
 
 Note: the v4l2loopback-dkms package seems to be broken in Saucy (13.10), as it refers to an old v4l2loopback release (0.7.0) and not to the latest version as of date (0.8.0). Please install v4l2loopback from its official Github repo.
-
-Note: You can install this script from AUR in Arch Linux with ipwebcam-gst-git package. It will resolve all dependencies automatically.
