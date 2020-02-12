@@ -137,6 +137,10 @@ fi
 ADB_PATH=~/bin/android-sdk-linux_x86/platform-tools/adb
 if which adb > /dev/null ; then
     ADB=$(which adb)
+elif [ -f $ANDROID_SDK_ROOT/platform-tools/adb ] ; then
+    ADB=$ANDROID_SDK_ROOT/platform-tools/adb
+elif [ -f $ANDROID_HOME/platform-tools/adb ] ; then
+    ADB=$ANDROID_HOME/platform-tools/adb
 else
     ADB=$ADB_PATH
 fi
