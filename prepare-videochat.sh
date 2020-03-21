@@ -228,20 +228,20 @@ check_os_version() {
 }
 
 error() {
-    zenity --error --text "$@" > /dev/null 2>&1
+    zenity --error --no-wrap --text "$@" > /dev/null 2>&1
     exit 1
 }
 
 warning() {
-    zenity --warning --text "$@" > /dev/null 2>&1
+    zenity --warning --no-wrap --text "$@" > /dev/null 2>&1
 }
 
 info() {
-    zenity --info --text "$@" > /dev/null 2>&1
+    zenity --info --no-wrap --text "$@" > /dev/null 2>&1
 }
 
 confirm() {
-    zenity --question --text "$@" > /dev/null 2>&1
+    zenity --question --no-wrap --text "$@" > /dev/null 2>&1
 }
 
 can_run() {
@@ -482,11 +482,11 @@ fi
 
 while ! iw_server_is_started; do
       if [ $CAPTURE_STREAM = av ]; then
-	MESSAGE="The IP Webcam audio feed is not reachable at $AUDIO_URL.\nThe IP Webcam video feed is not reachable at $VIDEO_URL."
+	MESSAGE="The IP Webcam audio feed is not reachable at <a href=\"$AUDIO_URL\">$AUDIO_URL</a>.\nThe IP Webcam video feed is not reachable at <a href=\"$VIDEO_URL\">$VIDEO_URL</a>."
       elif [ $CAPTURE_STREAM = a ]; then
-	  MESSAGE="The IP Webcam audio feed is not reachable at $AUDIO_URL."
+	  MESSAGE="The IP Webcam audio feed is not reachable at <a href=\"$AUDIO_URL\">$AUDIO_URL</a>."
       elif [ $CAPTURE_STREAM = v ]; then
-	  MESSAGE="The IP Webcam video feed is not reachable at $VIDEO_URL."
+	  MESSAGE="The IP Webcam video feed is not reachable at <a href=\"$VIDEO_URL\">$VIDEO_URL</a>."
       else
 	  error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
       fi
