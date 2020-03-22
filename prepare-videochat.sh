@@ -317,16 +317,21 @@ module_id_by_sourcename() {
     pacmd list-sources | grep -e 'name:' -e 'module:' | grep -A1 "name: <$1>" | grep module: | cut -f2 -d: | tr -d ' '
 }
 
+declare -A DISTS
+DISTS=(["Debian"]=1 ["Ubuntu"]=2 ["Arch"]=3 ["LinuxMint"]=4)
 
 if can_run lsb_release; then
     DIST=`lsb_release -i | cut -f2 -d ":"`
     RELEASE=`lsb_release -r | cut -f2 -d ":"`
-elif [ -f "/etc/arch-release" ]; then
-    DIST="Arch"
-    RELEASE=""
-elif [ -f /etc/debian_version ] ; then
-    DIST="Debian"
-    RELEASE=`perl -ne 'chomp; if(m:(jessie|testing|sid):){print "8.0"}elsif(m:[\d\.]+:){print}else{print "0.0"}' < /etc/debian_version`
+fi
+if [ -z "${DISTS[$DIST]}" ] ; then 
+    if [ -f "/etc/arch-release" ]; then
+        DIST="Arch"
+        RELEASE=""
+    elif [ -f "/etc/debian_version" ] ; then
+        DIST="Debian"
+        RELEASE=`perl -ne 'chomp; if(m:(jessie|testing|sid):){print "8.0"}elsif(m:[\d\.]+:){print}else{print "0.0"}' < /etc/debian_version`
+    fi
 fi
 
 GST_VER="0.10"
