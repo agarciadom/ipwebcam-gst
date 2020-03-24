@@ -200,8 +200,7 @@ has_kernel_module() {
     else
        # Determining kernel object existence
        # I do not know why, but using -q in egrep makes it always return 1, so do not use it
-       if [ 
-	`find /lib/modules/$(uname -r)/ -name "$MODULE.ko.*" | egrep '.*' || 
+       if [ `find /lib/modules/$(uname -r)/ -name "$MODULE.ko.*" | egrep '.*' || 
 	find /lib/modules/$(uname -r)/extra -name "$MODULE.ko.*" | egrep '.*'||
 	find /lib/modules/$(uname -r)/extramodules -name "$MODULE.ko.*" | egrep '.*'` ]; then
         return 0
@@ -228,20 +227,20 @@ check_os_version() {
 }
 
 error() {
-    zenity --error --text "$@" > /dev/null 2>&1
+    zenity --error --no-wrap --text "$@" > /dev/null 2>&1
     exit 1
 }
 
 warning() {
-    zenity --warning --text "$@" > /dev/null 2>&1
+    zenity --warning --no-wrap --text "$@" > /dev/null 2>&1
 }
 
 info() {
-    zenity --info --text "$@" > /dev/null 2>&1
+    zenity --info --no-wrap --text "$@" > /dev/null 2>&1
 }
 
 confirm() {
-    zenity --question --text "$@" > /dev/null 2>&1
+    zenity --question --no-wrap --text "$@" > /dev/null 2>&1
 }
 
 can_run() {
@@ -318,16 +317,21 @@ module_id_by_sourcename() {
     pacmd list-sources | grep -e 'name:' -e 'module:' | grep -A1 "name: <$1>" | grep module: | cut -f2 -d: | tr -d ' '
 }
 
+declare -A DISTS
+DISTS=(["Debian"]=1 ["Ubuntu"]=2 ["Arch"]=3 ["LinuxMint"]=4)
 
 if can_run lsb_release; then
     DIST=`lsb_release -i | cut -f2 -d ":"`
     RELEASE=`lsb_release -r | cut -f2 -d ":"`
-elif [ -f "/etc/arch-release" ]; then
-    DIST="Arch"
-    RELEASE=""
-elif [ -f /etc/debian_version ] ; then
-    DIST="Debian"
-    RELEASE=`perl -ne 'chomp; if(m:(jessie|testing|sid):){print "8.0"}elsif(m:[\d\.]+:){print}else{print "0.0"}' < /etc/debian_version`
+fi
+if [ -z "${DISTS[$DIST]}" ] ; then 
+    if [ -f "/etc/arch-release" ]; then
+        DIST="Arch"
+        RELEASE=""
+    elif [ -f "/etc/debian_version" ] ; then
+        DIST="Debian"
+        RELEASE=`perl -ne 'chomp; if(m:(jessie|testing|sid):){print "8.0"}elsif(m:[\d\.]+:){print}else{print "0.0"}' < /etc/debian_version`
+    fi
 fi
 
 GST_VER="0.10"
@@ -482,11 +486,11 @@ fi
 
 while ! iw_server_is_started; do
       if [ $CAPTURE_STREAM = av ]; then
-	MESSAGE="The IP Webcam audio feed is not reachable at $AUDIO_URL.\nThe IP Webcam video feed is not reachable at $VIDEO_URL."
+	MESSAGE="The IP Webcam audio feed is not reachable at <a href=\"$AUDIO_URL\">$AUDIO_URL</a>.\nThe IP Webcam video feed is not reachable at <a href=\"$VIDEO_URL\">$VIDEO_URL</a>."
       elif [ $CAPTURE_STREAM = a ]; then
-	  MESSAGE="The IP Webcam audio feed is not reachable at $AUDIO_URL."
+	  MESSAGE="The IP Webcam audio feed is not reachable at <a href=\"$AUDIO_URL\">$AUDIO_URL</a>."
       elif [ $CAPTURE_STREAM = v ]; then
-	  MESSAGE="The IP Webcam video feed is not reachable at $VIDEO_URL."
+	  MESSAGE="The IP Webcam video feed is not reachable at <a href=\"$VIDEO_URL\">$VIDEO_URL</a>."
       else
 	  error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
       fi
