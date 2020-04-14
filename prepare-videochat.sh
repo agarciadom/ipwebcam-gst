@@ -47,7 +47,7 @@
 # you want (default is 1). For instance, if you want 2:
 #
 #   sudo modprobe -r v4l2loopback
-#   sudo modprobe v4l2loopback devices=2
+#   sudo modprobe v4l2loopback exclusive_caps=1 devices=2
 #
 # Next, run two copies of this script with explicit WIFI_IP and DEVICE
 # settings (see CONFIGURATION):
@@ -65,7 +65,7 @@
 #  sudo modprobe -r v4l2loopback
 #  ls /dev/video*
 #  (Note down the devices available.)
-#  sudo modprobe v4l2loopback
+#  sudo modprobe v4l2loopback exclusive_caps=1
 #  ls /dev/video*
 #  (Note down the new devices: let X be the number of the first new device.)
 #  v4l2-ctl -D -d /dev/videoX
@@ -189,6 +189,10 @@ CAPTURE_STREAM=av
 # timestamping or you do not need audio, you can try changing this to false.
 SYNC=true
 
+# Options for loading the v4l2loopback:
+#   * use of exclusive_caps=1 is recommended in v4l2loopback#78
+V4L2_OPTS="exclusive_caps=1"
+
 ### FUNCTIONS
 
 has_kernel_module() {
@@ -282,7 +286,6 @@ url_reachable() {
 send_intent() {
     "$ADB" $ADB_FLAGS shell am start -a android.intent.action.MAIN -n $@
 }
-
 
 iw_server_is_started() {
     # todo: should check not just reachable, but if is not 404 page
@@ -412,7 +415,7 @@ if lsmod | grep -w v4l2loopback >/dev/null 2>/dev/null; then
     :
 elif [ $CAPTURE_STREAM = v -o $CAPTURE_STREAM = av ]; then
     echo Loading module
-    sudo modprobe v4l2loopback #-q > /dev/null 2>&1
+    sudo modprobe v4l2loopback $V4L2_OPTS #-q > /dev/null 2>&1
 fi
 
 # check if the user has the pulse gst plugin installed
@@ -437,17 +440,25 @@ if ! can_run v4l2-ctl; then
 fi
 if [ -z "$DEVICE" ]; then
     if can_run v4l2-ctl; then
-	for d in /dev/video*; do
+	      for d in /dev/video*; do
             if v4l2-ctl -d "$d" -D | grep -q "v4l2 loopback"; then
-		DEVICE=$d
-		break
+		            DEVICE=$d
+		            break
             fi
-	done
+	      done
     fi
     if [ -z "$DEVICE" ]; then
-	DEVICE=/dev/video0
-	warning "Could not find the v4l2loopback device: falling back to $DEVICE"
+	      DEVICE=/dev/video0
+	      warning "Could not find the v4l2loopback device: falling back to $DEVICE"
     fi
+fi
+
+# Test that we can read from and write to the device
+if ! test -r "$DEVICE"; then
+    error "$DEVICE is not readable: please fix your permissions"
+fi
+if ! test -w "$DEVICE"; then
+    error "$DEVICE is not writable: please fix your permissions"
 fi
 
 # Decide whether to connect through USB or through wi-fi
@@ -550,12 +561,12 @@ set +e
 
 pipeline_video() {
   echo souphttpsrc location="$VIDEO_URL" do-timestamp=true is-live=true \
+    ! queue \
     ! multipartdemux \
     ! decodebin \
     $GST_FLIP \
     ! $GST_VIDEO_CONVERTER \
     ! videoscale \
-    ! videorate \
     ! $GST_VIDEO_CAPS \
     ! v4l2sink device="$DEVICE" sync=$SYNC
 }
