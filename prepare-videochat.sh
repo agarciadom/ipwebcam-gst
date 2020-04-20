@@ -3,7 +3,7 @@
 # Script for using IP Webcam as a microphone/webcam in Debian Jessie,
 # Ubuntu 13.04, 14.04, 16.04 and Arch Linux
 
-# Copyright (C) 2011-2016 Antonio García Domínguez
+# Copyright (C) 2011-2020 Antonio García Domínguez
 # Copyright (C) 2016 C.J. Adams-Collier
 # Copyright (C) 2016 Laptander
 # Licensed under GPLv3
@@ -30,6 +30,7 @@
 # Then to use audio stream in Audacity, open it and press record button or click on
 # the Recording Meter Toolbar to start monitoring, then go to pavucontrol's Recording tab
 # and choose "Monitor of IP Webcam" for ALSA plug-in [audacity].
+#
 # If you want to be able to hear other applications sounds, for example from web-browser,
 # then while it is playing some sound, go to pavucontrol's Playback tab and choose your
 # default sound card for web-browser.
@@ -280,34 +281,31 @@ url_reachable() {
     if [ $DISABLE_PROXY = 1 ]; then
         CURL_OPTIONS="--noproxy $WIFI_IP"
     fi
-    curl $CURL_OPTIONS -m 5 -sI "$1" >/dev/null
-}
 
-send_intent() {
-    "$ADB" $ADB_FLAGS shell am start -a android.intent.action.MAIN -n $@
+    # -f produces a non-zero status code when answer is 4xx or 5xx
+    curl $CURL_OPTIONS -f -m 5 -sI "$1" >/dev/null
 }
 
 iw_server_is_started() {
-    # todo: should check not just reachable, but if is not 404 page
-    # otherwise if ip webcam is streaming a, but script expects av,
-    # it will display that all ok, but actually not working.
     if [ $CAPTURE_STREAM = av ]; then
-      : # help me optimize this code
-	temp=$(url_reachable "$AUDIO_URL"); au=$?; #echo au=$au
-	temp=$(url_reachable "$VIDEO_URL"); vu=$?; #echo vu=$vu
-	if [ $au = 0 -a $vu = 0 ]; then return 0; else return 1; fi
+        : # help me optimize this code
+	      temp=$(url_reachable "$AUDIO_URL"); au=$?; #echo au=$au
+	      temp=$(url_reachable "$VIDEO_URL"); vu=$?; #echo vu=$vu
+	      if [ $au = 0 -a $vu = 0 ]; then return 0; else return 1; fi
     elif [ $CAPTURE_STREAM = a ]; then
-	if url_reachable "$AUDIO_URL"; then return 0; else return 1; fi
+	      if url_reachable "$AUDIO_URL"; then return 0; else return 1; fi
     elif [ $CAPTURE_STREAM = v ]; then
-	if url_reachable "$VIDEO_URL"; then return 0; else return 1; fi
+	      if url_reachable "$VIDEO_URL"; then return 0; else return 1; fi
     else
-	error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
+	      error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
     fi
-    echo You are in error; return 1
 }
 
 start_iw_server() {
-    send_intent com.pas.webcam/.Rolling
+    # Note: recent versions of IP Webcam do not export the Rolling intent due
+    # to security reasons. Users will have to start that on their own.
+    echo "Please start IP Webcam or IP Webcam Pro server and press Enter"
+    read
     sleep 2s
 }
 
@@ -496,15 +494,15 @@ if phone_plugged && ! iw_server_is_started; then
 fi
 
 while ! iw_server_is_started; do
-      if [ $CAPTURE_STREAM = av ]; then
-	MESSAGE="The IP Webcam audio feed is not reachable at <a href=\"$AUDIO_URL\">$AUDIO_URL</a>.\nThe IP Webcam video feed is not reachable at <a href=\"$VIDEO_URL\">$VIDEO_URL</a>."
-      elif [ $CAPTURE_STREAM = a ]; then
-	  MESSAGE="The IP Webcam audio feed is not reachable at <a href=\"$AUDIO_URL\">$AUDIO_URL</a>."
-      elif [ $CAPTURE_STREAM = v ]; then
-	  MESSAGE="The IP Webcam video feed is not reachable at <a href=\"$VIDEO_URL\">$VIDEO_URL</a>."
-      else
-	  error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
-      fi
+    if [ $CAPTURE_STREAM = av ]; then
+	      MESSAGE="The IP Webcam audio feed is not reachable at <a href=\"$AUDIO_URL\">$AUDIO_URL</a>.\nThe IP Webcam video feed is not reachable at <a href=\"$VIDEO_URL\">$VIDEO_URL</a>."
+    elif [ $CAPTURE_STREAM = a ]; then
+	      MESSAGE="The IP Webcam audio feed is not reachable at <a href=\"$AUDIO_URL\">$AUDIO_URL</a>."
+    elif [ $CAPTURE_STREAM = v ]; then
+	      MESSAGE="The IP Webcam video feed is not reachable at <a href=\"$VIDEO_URL\">$VIDEO_URL</a>."
+    else
+	      error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
+    fi
     info "$MESSAGE\nPlease install and open IP Webcam in your phone and start the server.\nMake sure that values of variables IP, PORT, CAPTURE_STREAM in this script are equal with settings in IP Webcam."
 done
 
