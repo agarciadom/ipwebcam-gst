@@ -565,6 +565,7 @@ pipeline_video() {
     $GST_FLIP \
     ! $GST_VIDEO_CONVERTER \
     ! videoscale \
+    ! videorate \
     ! $GST_VIDEO_CAPS \
     ! v4l2sink device="$DEVICE" sync=$SYNC
 }
