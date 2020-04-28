@@ -325,7 +325,7 @@ if can_run lsb_release; then
     DIST=`lsb_release -i | cut -f2 -d ":"`
     RELEASE=`lsb_release -r | cut -f2 -d ":"`
 fi
-if [ -z "${DISTS[$DIST]}" ] ; then 
+if [ -z "$DIST" ] || [ -z "${DISTS[$DIST]}" ] ; then 
     if [ -f "/etc/arch-release" ]; then
         DIST="Arch"
         RELEASE=""
