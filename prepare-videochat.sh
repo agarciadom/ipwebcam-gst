@@ -2,12 +2,12 @@
 
 # Script for using IP Webcam as a microphone/webcam in Debian Jessie,
 # Ubuntu 13.04, 14.04, 16.04 and Arch Linux
-
+#
 # Copyright (C) 2011-2020 Antonio García Domínguez
 # Copyright (C) 2016 C.J. Adams-Collier
 # Copyright (C) 2016 Laptander
 # Licensed under GPLv3
-
+#
 # Usage: ./prepare-videochat.sh [flip method]
 #
 # [flip method] is "none" by default. Here are some values you can try
@@ -34,7 +34,7 @@
 # If you want to be able to hear other applications sounds, for example from web-browser,
 # then while it is playing some sound, go to pavucontrol's Playback tab and choose your
 # default sound card for web-browser.
-
+#
 #
 # INSTALLATION
 #
@@ -117,84 +117,29 @@
 # - v4l2sink version 1.0.6
 # - v4l2loopback version 0.7.0
 
-# Exit on first error
-set -e
-
-if [ -n "$1" ]; then
-    FLIP_METHOD=$1
-else
-    FLIP_METHOD=none
-fi
-
-GST_FLIP="! videoflip method=\"$FLIP_METHOD\" "
-if [ $FLIP_METHOD = 'none' ]; then
-    GST_FLIP=""
-fi
-
-### CONFIGURATION
-
-# If your "adb" is not in your $PATH, set the full path to it here.
-# If "adb" is in your $PATH, you don't have to change this option.
-ADB_PATH=~/bin/android-sdk-linux_x86/platform-tools/adb
-if which adb > /dev/null ; then
-    ADB=$(which adb)
-elif [ -f $ANDROID_SDK_ROOT/platform-tools/adb ] ; then
-    ADB=$ANDROID_SDK_ROOT/platform-tools/adb
-elif [ -f $ANDROID_HOME/platform-tools/adb ] ; then
-    ADB=$ANDROID_HOME/platform-tools/adb
-else
-    ADB=$ADB_PATH
-fi
-
-# Flags for ADB.
-ADB_FLAGS=
-#ADB_FLAGS="$ADB_FLAGS -s deviceid" # use when you need to pick from several devices (check deviceid in 'adb devices')
-
-# idea: make ability to choose IP version (usefull for IPv6-only environment)
-# IP_VERSION=4
-
-# IP used by the phone in your wireless network
-WIFI_IP=192.168.2.140
-
-# Port on which IP Webcam is listening
-PORT=8080
-
-# To disable proxy while acessing WIFI_IP (set value 1 to disable, 0 for not)
-# For cases when host m/c is connected to a Proxy-Server and WIFI_IP belongs to local network
-DISABLE_PROXY=0
-
-# Dimensions of video
-WIDTH=640
-HEIGHT=480
-
-# Frame rate of video
-GST_FPS=24
-
-# Choose audio codec from wav, aac or opus
-# do not choose opus until editing pipeline. If choose opus, pipeline will not work
-# and some errors will appear in feed.log.
-# I do not know how to edit pipelines for now.
-AUDIO_CODEC=wav
-
-# Choose which stream to capture.
-#  a - audio only, v - video only, av - audio and video.
-# Make sure that IP webcam is streaming corresponding streams, otherwise error will occur.
-CAPTURE_STREAM=av
-
-# Loopback device to be used. This only needs to be uncommented if you
-# want to skip autodetection (e.g. for multiple webcams):
-#DEVICE=/dev/video0
-
-# Force syncing to timestamps. Useful to keep audio and video in sync,
-# but may impact performance in slow connections. If you see errors about
-# timestamping or you do not need audio, you can try changing this to false.
-SYNC=true
-
-# Options for loading the v4l2loopback:
-#   * use of exclusive_caps=1 is recommended in v4l2loopback#78
-V4L2_OPTS="exclusive_caps=1"
-
 ### FUNCTIONS
+
+show_help() {
+    echo "Usage:"
+    echo " $0 [options]"
+    echo
+    echo "Script for using IP Webcam as a microphone/webcam."
+    echo
+    echo "Options:"
+    echo " -a, --audio            capture only audio"
+    echo " -b, --adb-path <path>  set adb location if not in PATH"
+    echo " -d, --device <device>  force video device to use"
+    echo " -f, --flip <flip>      flip image"
+    echo " -h, --height <height>  set image height (default 480)"
+    echo " -l, --adb-flags <id>   adb flags to specify device id"
+    echo " -i, --use-wifi <ip>    use wi-fi mode with specified ip"
+    echo " -p, --port <port>      port on which IP Webcam is listening (default 8080)"
+    echo " -s, --no-sync          No force syncing to timestamps"
+    echo " -v, --video            capture only video"
+    echo " -w, --width <width>    set image width (default 640)"
+    echo " -x, --no-proxy         disable proxy while acessing IP"
+    echo "     --help             show this help"
+}
 
 has_kernel_module() {
     # Checks if module exists in system (but does not load it)
@@ -203,64 +148,36 @@ has_kernel_module() {
         # echo "$MODULE is loaded! So it exists."
         return 0
     else
-       # Determining kernel object existence
-       # I do not know why, but using -q in egrep makes it always return 1, so do not use it
-       if [ `find /lib/modules/$(uname -r)/ -name "$MODULE.ko.*" | egrep '.*' || 
-	find /lib/modules/$(uname -r)/extra -name "$MODULE.ko.*" | egrep '.*'||
-       find /lib/modules/$(uname -r)/extramodules -name "$MODULE.ko.*" | egrep '.*'||
-       find /lib/modules/$(uname -r)/updates/dkms -name "$MODULE.ko" | egrep '.*'` ]; then
-        return 0
-       else
-        return 1
-       fi
+        # Determining kernel object existence
+        # I do not know why, but using -q in egrep makes it always return 1, so do not use it
+        if [ `find /lib/modules/$(uname -r)/ -name "$MODULE.ko.*" | egrep '.*' || 
+              find /lib/modules/$(uname -r)/extra -name "$MODULE.ko.*" | egrep '.*'||
+              find /lib/modules/$(uname -r)/extramodules -name "$MODULE.ko.*" | egrep '.*'||
+              find /lib/modules/$(uname -r)/updates/dkms -name "$MODULE.ko" | egrep '.*'` ]; then
+            return 0
+        else
+            return 1
+        fi
     fi
-
-}
-
-check_os_version() {
-    # checks if the OS version can use newer GStreamer version
-    DIST="$1"
-    RELEASE="$2"
-
-    case "$DIST" in
-        "Debian")       return "`echo "$RELEASE < 8.0"   | bc`" ;;
-        "Ubuntu")       return "`echo "$RELEASE < 14.04" | bc`" ;;
-        "LinuxMint")    return "`echo "$RELEASE < 14.04" | bc`" ;;
-        "Arch")         return 0 ;;
-    esac
-    # assume other Distributions are also new enough, by now
-    return 0
 }
 
 error() {
-    zenity --error --no-wrap --text "$@" > /dev/null 2>&1
+    echo -e "ERROR: $@"
+    if [ "$MODE" = "adb" ]; then "$ADB" $ADB_FLAGS forward --remove tcp:$PORT; fi
     exit 1
 }
 
 warning() {
-    zenity --warning --no-wrap --text "$@" > /dev/null 2>&1
+    echo -e "WARNING: $@"
 }
 
 info() {
-    zenity --info --no-wrap --text "$@" > /dev/null 2>&1
-}
-
-confirm() {
-    zenity --question --no-wrap --text "$@" > /dev/null 2>&1
+    echo -e "$@"
 }
 
 can_run() {
-    # It's either the path to a file, or the name of an executable in $PATH
-    which "$1" >/dev/null 2>/dev/null
-}
-
-install_package() {
-    if [ $DIST = "Debian" ] || [ $DIST = "Ubuntu" ] || [ $DIST = "LinuxMint" ]; then
-        echo "Trying to install $1 package."
-        sudo apt-get install -y "$1"
-    elif [ $DIST = "Arch" ]; then
-        error "Please install $1 package"
-    fi
+    # It's either the path to a file, or the name of an executable in $PATH, or a internal command
+    command -v "$1" >/dev/null 2>&1
 }
 
 start_adb() {
@@ -272,15 +189,9 @@ phone_plugged() {
 }
 
 url_reachable() {
-    if ! can_run curl && can_run apt-get; then
-        # Some versions of Ubuntu do not have curl by default (Arch
-        # has it in its core, so we don't need to check that case)
-        sudo apt-get install -y curl
-    fi
-
     CURL_OPTIONS=""
     if [ $DISABLE_PROXY = 1 ]; then
-        CURL_OPTIONS="--noproxy $WIFI_IP"
+        CURL_OPTIONS="--noproxy $IP"
     fi
 
     # -f produces a non-zero status code when answer is 4xx or 5xx
@@ -290,89 +201,104 @@ url_reachable() {
 iw_server_is_started() {
     if [ $CAPTURE_STREAM = av ]; then
         : # help me optimize this code
-	      temp=$(url_reachable "$AUDIO_URL"); au=$?; #echo au=$au
-	      temp=$(url_reachable "$VIDEO_URL"); vu=$?; #echo vu=$vu
-	      if [ $au = 0 -a $vu = 0 ]; then return 0; else return 1; fi
+          temp=$(url_reachable "$AUDIO_URL"); au=$?; #echo au=$au
+          temp=$(url_reachable "$VIDEO_URL"); vu=$?; #echo vu=$vu
+          if [ $au = 0 -a $vu = 0 ]; then return 0; else return 1; fi
     elif [ $CAPTURE_STREAM = a ]; then
-	      if url_reachable "$AUDIO_URL"; then return 0; else return 1; fi
+          if url_reachable "$AUDIO_URL"; then return 0; else return 1; fi
     elif [ $CAPTURE_STREAM = v ]; then
-	      if url_reachable "$VIDEO_URL"; then return 0; else return 1; fi
+          if url_reachable "$VIDEO_URL"; then return 0; else return 1; fi
     else
-	      error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
+          error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
     fi
-}
-
-start_iw_server() {
-    # Note: recent versions of IP Webcam do not export the Rolling intent due
-    # to security reasons. Users will have to start that on their own.
-    echo "Please start IP Webcam or IP Webcam Pro server and press Enter"
-    read
-    sleep 2s
 }
 
 module_id_by_sinkname() {
     pacmd list-sinks | grep -e 'name:' -e 'module:' | grep -A1 "name: <$1>" | grep module: | cut -f2 -d: | tr -d ' '
 }
 
-# is this function needed somewhere?
-module_id_by_sourcename() {
-    pacmd list-sources | grep -e 'name:' -e 'module:' | grep -A1 "name: <$1>" | grep module: | cut -f2 -d: | tr -d ' '
-}
+### CONFIGURATION
 
-declare -A DISTS
-DISTS=(["Debian"]=1 ["Ubuntu"]=2 ["Arch"]=3 ["LinuxMint"]=4)
+# Exit on first error
+set -e
 
-if can_run lsb_release; then
-    DIST=`lsb_release -i | cut -f2 -d ":"`
-    RELEASE=`lsb_release -r | cut -f2 -d ":"`
-fi
-if [ -z "$DIST" ] || [ -z "${DISTS[$DIST]}" ] ; then 
-    if [ -f "/etc/arch-release" ]; then
-        DIST="Arch"
-        RELEASE=""
-    elif [ -f "/etc/debian_version" ] ; then
-        DIST="Debian"
-        RELEASE=`perl -ne 'chomp; if(m:(jessie|testing|sid):){print "8.0"}elsif(m:[\d\.]+:){print}else{print "0.0"}' < /etc/debian_version`
-    fi
-fi
+# Choose which stream to capture.
+# a - audio only, v - video only, av - audio and video.
+# Make sure that IP webcam is streaming corresponding streams, otherwise error will occur.
+# Defaults to audio and video, ovverrided by command line options.
+CAPTURE_STREAM=av
 
-GST_VER="0.10"
-GST_VIDEO_CONVERTER="ffmpegcolorspace"
-GST_VIDEO_MIMETYPE="video/x-raw-yuv"
-GST_VIDEO_FORMAT="format=(fourcc)YUY2"
+# Choose audio codec from wav, aac or opus
+# do not choose opus until editing pipeline. If choose opus, pipeline will not work
+# and some errors will appear in feed.log.
+# I do not know how to edit pipelines for now.
+AUDIO_CODEC=wav
 
-GST_AUDIO_MIMETYPE="audio/x-raw-int"
-GST_AUDIO_FORMAT="width=16,depth=16,endianness=1234,signed=true"
+# Port on which IP Webcam is listening
+# Defaults to 8080, ovverrided by command line options.
+PORT=8080
+
+# If your "adb" is not in your $PATH, specify it on command line.
+if can_run adb; then ADB=$(which adb); fi
+
+# Flags for ADB.
+# when you need to pick from several devices, specify deviceid on command line (list deviceids with 'adb devices').
+ADB_FLAGS=
+
+# set on command line
+FLIP_METHOD=
+
+# Default dimensions of video, can be ovverrided on command line.
+WIDTH=640
+HEIGHT=480
+
+# Force syncing to timestamps. Useful to keep audio and video in sync,
+# but may impact performance in slow connections. If you see errors about
+# timestamping or you do not need audio, you can try changing this to false from command line.
+SYNC=true
+
+# To disable proxy while acessing IP (set value 1 to disable, 0 for not)
+# For cases when host m/c is connected to a Proxy-Server and IP belongs to local network
+DISABLE_PROXY=0
+
+OPTS=`getopt -o ab:d:f:h:l:i:p:svw:x --long audio,adb-path:,device:,flip:,height:,help,adb-flags:,use-wifi:,port:,no-sync,video,width:,no-proxy -n "$0" -- "$@"`
+eval set -- "$OPTS"
+
+while true; do
+    case "$1" in
+        -a | --audio ) CAPTURE_STREAM="a"; shift;;
+        -b | --adb-path ) ADB="$2"; shift 2;;
+        -d | --device ) DEVICE="$2"; shift 2;;
+        -f | --flip ) FLIP_METHOD="$2"; shift 2;;
+        -h | --height ) HEIGHT="$2"; shift 2;;
+        -l | --adb-flags ) ADB_FLAGS="-s $2"; shift 2;;
+        -i | --use-wifi ) IP="$2"; shift 2;;
+        -p | --port ) PORT="$2"; shift 2;;
+        -s | --no-sync ) SYNC=false; shift;;
+        -v | --video ) CAPTURE_STREAM="v"; shift;;
+        -w | --width ) WIDTH="$2"; shift 2;;
+        -x | --no-proxy) DISABLE_PROXY=1; shift;;
+        --help) show_help; exit; shift;;
+        -- ) shift; break;;
+        * ) echo "Internal error!" ; exit 1 ;;
+    esac
+done
+
+### MAIN BODY
+GST_VER="1.0"
+
+GST_VIDEO_CONVERTER="videoconvert"
+GST_VIDEO_MIMETYPE="video/x-raw"
+GST_VIDEO_FORMAT="format=YUY2"
+
+GST_AUDIO_MIMETYPE="audio/x-raw"
+GST_AUDIO_FORMAT="format=S16LE"
 GST_AUDIO_RATE="rate=44100"
 GST_AUDIO_CHANNELS="channels=1"
-GST_AUDIO_LAYOUT=""
-
-GST_1_0_AUDIO_FORMAT="format=S16LE"
-GST_0_10_VIDEO_MIMETYPE=$GST_VIDEO_MIMETYPE
-GST_0_10_VIDEO_FORMAT=$GST_VIDEO_FORMAT
-
-if ! can_run bc; then
-    install_package bc
-fi
-
-set +e
-check_os_version $DIST $RELEASE
-set -e
-if [ $? -eq 0 ]
-then
-    GST_VER="1.0"
-    GST_VIDEO_CONVERTER="videoconvert"
-    GST_VIDEO_MIMETYPE="video/x-raw"
-    GST_VIDEO_FORMAT="format=YUY2"
-
-    GST_AUDIO_MIMETYPE="audio/x-raw"
-    GST_AUDIO_FORMAT=$GST_1_0_AUDIO_FORMAT
-    GST_AUDIO_LAYOUT=",layout=interleaved"
-fi
+GST_AUDIO_LAYOUT=",layout=interleaved"
 
 DIMENSIONS="width=$WIDTH,height=$HEIGHT"
 
-GST_0_10_VIDEO_CAPS="$GST_0_10_VIDEO_MIMETYPE,$GST_0_10_VIDEO_FORMAT,$DIMENSIONS"
 GST_VIDEO_CAPS="$GST_VIDEO_MIMETYPE,$GST_VIDEO_FORMAT,$DIMENSIONS"
 GST_AUDIO_CAPS="$GST_AUDIO_MIMETYPE,$GST_AUDIO_FORMAT$GST_AUDIO_LAYOUT,$GST_AUDIO_RATE,$GST_AUDIO_CHANNELS"
 PA_AUDIO_CAPS="$GST_AUDIO_FORMAT $GST_AUDIO_RATE $GST_AUDIO_CHANNELS"
@@ -381,74 +307,27 @@ PA_AUDIO_CAPS="$GST_AUDIO_FORMAT $GST_AUDIO_RATE $GST_AUDIO_CHANNELS"
 GST_DEBUG=souphttpsrc:0,videoflip:0,$GST_CONVERTER:0,v4l2sink:0,pulse:0
 # Is $GST_CONVERTER defined anywhere? Maybe you mean videoconvert vs ffmpegcolorspace? It is in GST_VIDEO_CONVERTER
 
-### MAIN BODY
-
-
-if ! can_run zenity; then
-    install_package zenity
-fi
-
 # Check if the user has v4l2loopback
 if ! has_kernel_module v4l2loopback; then
-    if [ $DIST = "Debian" ] || [ $DIST = "Ubuntu" ] || [ $DIST = "Arch" ]; then
-        install_package "v4l2loopback-dkms"
-        if [ $DIST = "Ubuntu" ]; then
-           install_package "python-apport"
-        fi
-
-        if [ $? != 0 ]; then
-            info "Installation failed.  Please install v4l2loopback manually from github.com/umlaeute/v4l2loopback."
-        fi
-    fi
-
-    if has_kernel_module v4l2loopback; then
-        info "The v4l2loopback kernel module was installed successfully."
-    else
-        error "Could not install the v4l2loopback kernel module through apt-get."
-    fi
-fi
-
-# Probe module if not probed yet
-if lsmod | grep -w v4l2loopback >/dev/null 2>/dev/null; then
-    # module is already loaded, do nothing
-    :
-elif [ $CAPTURE_STREAM = v -o $CAPTURE_STREAM = av ]; then
-    echo Loading module
-    sudo modprobe v4l2loopback $V4L2_OPTS #-q > /dev/null 2>&1
-fi
-
-# check if the user has the pulse gst plugin installed
-if find "/usr/lib/gstreamer-$GST_VER/libgstpulseaudio.so" "/usr/lib/gstreamer-$GST_VER/libgstpulse.so" "/usr/lib/$(uname -m)-linux-gnu/gstreamer-$GST_VER/libgstpulse.so" "/usr/lib/$(uname -m)-linux-gnu/gstreamer-$GST_VER/libgstpulseaudio.so" 2>/dev/null | egrep -q '.*'; then
-    # plugin installed, do nothing
-    # info "Found the pulse gst plugin"
-    :
-else
-    if [ $DIST = "Debian" ] || [ $DIST = "Ubuntu" ]; then
-        install_package "gstreamer${GST_VER}-pulseaudio"
-    elif [ $DIST = "Arch" ]; then
-        install_package "gst-plugins-good"
-    fi
+    error "kernel module v4l2loopback not found."
 fi
 
 # If the user hasn't manually specified which /dev/video* to use
 # through DEVICE, use the first "v4l2 loopback" device as the webcam:
 # this should help when loading v4l2loopback on a system that already
 # has a regular webcam. If that doesn't work, fall back to /dev/video0.
-if ! can_run v4l2-ctl; then
-    install_package v4l-utils
-fi
 if [ -z "$DEVICE" ]; then
     if can_run v4l2-ctl; then
-	      for d in /dev/video*; do
+        for d in /dev/video*; do
             if v4l2-ctl -d "$d" -D | grep -q "v4l2 loopback"; then
-		            DEVICE=$d
-		            break
+                DEVICE=$d
+                break
             fi
-	      done
+        done
     fi
     if [ -z "$DEVICE" ]; then
-	      DEVICE=/dev/video0
-	      warning "Could not find the v4l2loopback device: falling back to $DEVICE"
+        DEVICE=/dev/video0
+        warning "Could not find the v4l2loopback device: falling back to $DEVICE"
     fi
 fi
 
@@ -461,51 +340,41 @@ if ! test -w "$DEVICE"; then
 fi
 
 # Decide whether to connect through USB or through wi-fi
-IP=$WIFI_IP
-if ! can_run "$ADB"; then
-    warning "adb is not available: you'll have to use Wi-Fi, which will be slower. Next time, please install the Android SDK from developer.android.com/sdk or install adb package in Ubuntu"
-else
-    while ! phone_plugged && ! confirm "adb is available, but the phone is not plugged in. Are you sure you want to use Wi-Fi (slower)?\nIf you don't, please connect your phone to USB and allow usb debugging under developer settings."; do
-        true
-        sleep 1;
-    done
-    if phone_plugged; then
-        if ss -ln src :$PORT | grep -q :$PORT; then
-            warning "Your port $PORT seems to be in use: falling back to Wi-Fi. If you would like to use USB forwarding, please free it up and try again."
-        else
-            "$ADB" $ADB_FLAGS forward tcp:$PORT tcp:$PORT
-            IP=127.0.0.1
-        fi
+if [ -z $IP ]; then
+    # start adb daemon to avoid relaunching it in while
+    if ! can_run "$ADB"; then
+        error "adb is not available: you'll have to use Wi-Fi, which will be slower.\nNext time, please install the Android SDK from developer.android.com/sdk or install adb package."
     fi
+    start_adb
+    if ! phone_plugged; then
+        error "adb is available, but the phone is not plugged in.\nConnect your phone to USB and allow usb debugging under developer settings or use Wi-Fi (slower)."
+    fi
+    if ss -ln src :$PORT | grep -q :$PORT; then
+        error "Your port $PORT seems to be in use: try using Wi-Fi.\nIf you would like to use USB forwarding, please free it up and try again."
+    fi
+    "$ADB" $ADB_FLAGS forward tcp:$PORT tcp:$PORT
+    IP=127.0.0.1
+    MODE=adb
+else
+    MODE=wifi
 fi
 
 BASE_URL=http://$IP:$PORT
 VIDEO_URL=$BASE_URL/videofeed
 AUDIO_URL=$BASE_URL/audio.$AUDIO_CODEC
 
-# start adb daemon to avoid relaunching it in while
-if can_run "$ADB"; then
-  start_adb
-fi
-
-# Remind the user to open up IP Webcam and start the server
-if phone_plugged && ! iw_server_is_started; then
-    # If the phone is plugged to USB and we have ADB, we can start the server by sending an intent
-    start_iw_server
-fi
-
-while ! iw_server_is_started; do
+if ! iw_server_is_started; then
     if [ $CAPTURE_STREAM = av ]; then
-	      MESSAGE="The IP Webcam audio feed is not reachable at <a href=\"$AUDIO_URL\">$AUDIO_URL</a>.\nThe IP Webcam video feed is not reachable at <a href=\"$VIDEO_URL\">$VIDEO_URL</a>."
+          MESSAGE="The IP Webcam audio feed is not reachable at $AUDIO_URL.\nThe IP Webcam video feed is not reachable at <a href=\"$VIDEO_URL\">$VIDEO_URL</a>."
     elif [ $CAPTURE_STREAM = a ]; then
-	      MESSAGE="The IP Webcam audio feed is not reachable at <a href=\"$AUDIO_URL\">$AUDIO_URL</a>."
+          MESSAGE="The IP Webcam audio feed is not reachable at $AUDIO_URL."
     elif [ $CAPTURE_STREAM = v ]; then
-	      MESSAGE="The IP Webcam video feed is not reachable at <a href=\"$VIDEO_URL\">$VIDEO_URL</a>."
+          MESSAGE="The IP Webcam video feed is not reachable at $VIDEO_URL."
     else
-	      error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
+          error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
     fi
-    info "$MESSAGE\nPlease install and open IP Webcam in your phone and start the server.\nMake sure that values of variables IP, PORT, CAPTURE_STREAM in this script are equal with settings in IP Webcam."
-done
+    error "$MESSAGE\nPlease install and open IP Webcam in your phone and start the server.\nMake sure that values of variables IP, PORT, CAPTURE_STREAM in this script are equal with settings in IP Webcam."
+fi
 
 # idea: check if default-source is correct. If two copy of script are running,
 # then after ending first before second you will be set up with $SINK_NAME.monitor,
@@ -539,18 +408,8 @@ pactl set-default-source $SINK_NAME.monitor
 
 # Check for gst-launch
 GSTLAUNCH=gst-launch-${GST_VER}
-if [ $DIST = "Debian" ] || [ $DIST = "Ubuntu" ]; then
-    if ! can_run "$GSTLAUNCH"; then
-        install_package gstreamer${GST_VER}-tools
-    fi
-elif  [ $DIST = "Arch" ]; then
-    if ! can_run "$GSTLAUNCH"; then
-        error "You don't have gst-launch. Please install gstreamer and gst-plugins-good packages."
-    fi
-fi
 if ! can_run "$GSTLAUNCH"; then
     error "Could not find gst-launch. Exiting."
-    # exit 1 # you have already exited after error function.
 fi
 
 # Start the GStreamer graph needed to grab the video and audio
@@ -559,15 +418,20 @@ set +e
 #sudo v4l2loopback-ctl set-caps $GST_0_10_VIDEO_CAPS $DEVICE
 
 pipeline_video() {
-  echo souphttpsrc location="$VIDEO_URL" do-timestamp=true is-live=true \
-    ! queue \
-    ! multipartdemux \
-    ! decodebin \
-    $GST_FLIP \
-    ! $GST_VIDEO_CONVERTER \
-    ! videoscale \
-    ! $GST_VIDEO_CAPS \
-    ! v4l2sink device="$DEVICE" sync=$SYNC
+    GST_FLIP=""
+    if [ $FLIP_METHOD ]; then
+        GST_FLIP="! videoflip method=\"$FLIP_METHOD\" "
+    fi
+
+    echo souphttpsrc location="$VIDEO_URL" do-timestamp=true is-live=true \
+      ! queue \
+      ! multipartdemux \
+      ! decodebin \
+      $GST_FLIP \
+      ! $GST_VIDEO_CONVERTER \
+      ! videoscale \
+      ! $GST_VIDEO_CAPS \
+      ! v4l2sink device="$DEVICE" sync=$SYNC
 }
 
 pipeline_audio() {
@@ -586,7 +450,7 @@ else
     error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
 fi
 
-# echo "$PIPELINE"
+#echo "$PIPELINE"
 
 if [ $DISABLE_PROXY = 1 ]; then
     # Disabling proxy to access WIFI_IP viz. on local network
@@ -595,14 +459,14 @@ fi
 
 "$GSTLAUNCH" -e -vt --gst-plugin-spew \
              --gst-debug="$GST_DEBUG" \
-   $PIPELINE \
+    $PIPELINE \
     >feed.log 2>&1 &
     # Maybe we need edit this pipeline to transfer it to "Monitor of IP Webcam" to be able to use it as a microphone?
 
 GSTLAUNCH_PID=$!
 
 if [ $CAPTURE_STREAM = av ]; then
-   MESSAGE="IP Webcam audio is streaming through pulseaudio sink '$SINK_NAME'.\nIP Webcam video is streaming through v4l2loopback device $DEVICE.\n"
+    MESSAGE="IP Webcam audio is streaming through pulseaudio sink '$SINK_NAME'.\nIP Webcam video is streaming through v4l2loopback device $DEVICE.\n"
 elif [ $CAPTURE_STREAM = a ]; then
     MESSAGE="IP Webcam audio is streaming through pulseaudio sink '$SINK_NAME'.\n"
 elif [ $CAPTURE_STREAM = v ]; then
@@ -610,15 +474,16 @@ elif [ $CAPTURE_STREAM = v ]; then
 else
     error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
 fi
-info "$MESSAGE You can now open your videochat app."
+info "${MESSAGE}You can now open your videochat app."
 
 echo "Press enter to end stream"
-perl -e '<STDIN>'
+read
 
 kill $GSTLAUNCH_PID > /dev/null 2>&1 || echo ""
 pactl set-default-source ${DEFAULT_SOURCE}
 pactl unload-module ${ECANCEL_ID}
 pactl unload-module ${SINK_ID}
+if [ $MODE = adb ]; then "$ADB" $ADB_FLAGS forward --remove tcp:$PORT; fi
 
 echo "Disconnected from IP Webcam. Have a nice day!"
 # idea: capture ctrl-c signal and set default source back
