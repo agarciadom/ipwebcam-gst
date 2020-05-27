@@ -258,7 +258,8 @@ install_package() {
         echo "Trying to install $1 package."
         sudo apt-get install -y "$1"
     elif [ $DIST = "Arch" ]; then
-        error "Please install $1 package"
+        echo "Please install $1 package" 1>&2
+        exit 1
     fi
 }
 
