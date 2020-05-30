@@ -1,1 +1,6 @@
 feed.log
+debian/.debhelper/
+debian/debhelper-build-stamp
+debian/files
+debian/ipwebcam-gst.substvars
+debian/ipwebcam-gst/

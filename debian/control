@@ -1,0 +1,14 @@
+Source: ipwebcam-gst
+Section: video
+Priority: optional
+Maintainer: Samuele Battarra <battarsa@email.it>
+Build-Depends: debhelper-compat (= 12)
+Standards-Version: 4.5.0
+Homepage: https://github.com/battarsa/ipwebcam-gst
+
+Package: ipwebcam-gst
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, v4l2loopback-dkms, v4l-utils, curl, gstreamer1.0-pulseaudio, gstreamer1.0-tools, pulseaudio-utils, pulseaudio
+Recommends: adb
+Description: Shell script to use Android phones as webcam.
+ This is a shell script which allows Android users to use their phones as a webcam/microphone in Linux.
