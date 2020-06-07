@@ -205,9 +205,9 @@ has_kernel_module() {
     else
        # Determining kernel object existence
        # I do not know why, but using -q in egrep makes it always return 1, so do not use it
-       if [ `find /lib/modules/$(uname -r)/ -name "$MODULE.ko.*" | egrep '.*' || 
-	find /lib/modules/$(uname -r)/extra -name "$MODULE.ko.*" | egrep '.*'||
-	find /lib/modules/$(uname -r)/extramodules -name "$MODULE.ko.*" | egrep '.*'` ]; then
+       if [ `find /lib/modules/$(uname -r)/ -name "$MODULE.ko*" | egrep '.*' ||
+	find /lib/modules/$(uname -r)/extra -name "$MODULE.ko*" | egrep '.*'||
+	find /lib/modules/$(uname -r)/extramodules -name "$MODULE.ko*" | egrep '.*'` ]; then
         return 0
        else
         return 1
