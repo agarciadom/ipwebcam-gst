@@ -192,7 +192,7 @@ SYNC=true
 
 # Options for loading the v4l2loopback:
 #   * use of exclusive_caps=1 is recommended in v4l2loopback#78
-V4L2_OPTS="exclusive_caps=1"
+V4L2_OPTS="exclusive_caps=1 card_label=\"IP Webcam\""
 
 ### FUNCTIONS
 
