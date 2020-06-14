@@ -206,8 +206,9 @@ has_kernel_module() {
        # Determining kernel object existence
        # I do not know why, but using -q in egrep makes it always return 1, so do not use it
        if [ `find /lib/modules/$(uname -r)/ -name "$MODULE.ko*" | egrep '.*' ||
-	find /lib/modules/$(uname -r)/extra -name "$MODULE.ko*" | egrep '.*'||
-	find /lib/modules/$(uname -r)/extramodules -name "$MODULE.ko*" | egrep '.*'` ]; then
+          find /lib/modules/$(uname -r)/extra -name "$MODULE.ko*" | egrep '.*'||
+          find /lib/modules/$(uname -r)/extramodules -name "$MODULE.ko*" | egrep '.*'||
+          find /lib/modules/$(uname -r)/updates/dkms -name "$MODULE.ko*" | egrep '.*'` ]; then
         return 0
        else
         return 1
@@ -418,7 +419,7 @@ elif [ $CAPTURE_STREAM = v -o $CAPTURE_STREAM = av ]; then
 fi
 
 # check if the user has the pulse gst plugin installed
-if find "/usr/lib/gstreamer-$GST_VER/libgstpulseaudio.so" "/usr/lib/gstreamer-$GST_VER/libgstpulse.so" "/usr/lib/$(uname -m)-linux-gnu/gstreamer-$GST_VER/libgstpulse.so" 2>/dev/null | egrep -q '.*'; then
+if find "/usr/lib/gstreamer-$GST_VER/libgstpulseaudio.so" "/usr/lib/gstreamer-$GST_VER/libgstpulse.so" "/usr/lib/$(uname -m)-linux-gnu/gstreamer-$GST_VER/libgstpulse.so" "/usr/lib/$(uname -m)-linux-gnu/gstreamer-$GST_VER/libgstpulseaudio.so" 2>/dev/null | egrep -q '.*'; then
     # plugin installed, do nothing
     # info "Found the pulse gst plugin"
     :
