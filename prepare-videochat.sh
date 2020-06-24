@@ -620,5 +620,8 @@ pactl set-default-source ${DEFAULT_SOURCE}
 pactl unload-module ${ECANCEL_ID}
 pactl unload-module ${SINK_ID}
 
+# Remove the port forwarding, to avoid issues on the next run
+"$ADB" $ADB_FLAGS forward --remove tcp:$PORT
+
 echo "Disconnected from IP Webcam. Have a nice day!"
 # idea: capture ctrl-c signal and set default source back
