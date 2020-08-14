@@ -1,5 +1,4 @@
-ipwebcam-gst
-============
+# ipwebcam-gst
 
 This is a shell script which allows Android users to use their phones as a webcam/microphone in Linux. The setup is as follows:
 
@@ -9,16 +8,32 @@ This is a shell script which allows Android users to use their phones as a webca
 * Most videochat software in Linux is compatible with `v4l2loopback`: Skype 2.1 (*not* the latest 2.2, it seems), Cheese, Empathy, Google Talk video chats and Google+ hangouts should work.
 * The sound recording device for your videochat application should be changed to the 'Monitor of Null Sink' using `pavucontrol`.
 
-This project includes `prepare-videochat.sh`, which does all these things, except for switching the recording device for your videochat application. The script installs `v4l2loopback`, the GStreamer tools and the "good" plugins and `pavucontrol` if required, but you will have to install the [Android SDK](http://developer.android.com/sdk) by yourself.
+## How to use
 
-To use this script, simply run it with `./prepare-videochat.sh` and follow instructions. You may have to customize a few variables in the CONFIGURATION section before using it, though. You can also use something like `./prepare-videochat.sh horizontal-flip` to flip the video horizontally, in case you might need it.
+First, install all necessary dependencies with:
 
-You can choose which streams you want to recieve: audio, video or audio with video. This can be chosen using the `CAPTURE_STREAM` variable. Make sure that IP Webcam is streaming the corresponding streams: otherwise, the script won't work!
+```sh
+sudo ./install-videochat.sh
+```
+
+From then onwards, you should be able to bring up the webcam from your regular user account:
+
+```sh
+./run-videochat.sh
+```
+
+`run-videochat.sh` accepts a number of command-line flags: you can check these with `./run-videochat.sh --help`.
+
+Make sure you switch the recording device for your videochat application. The `install-videochat.sh` script installs `v4l2loopback`, the GStreamer tools and the "good" plugins and `pavucontrol` if required, but you will have to install the [Android SDK](http://developer.android.com/sdk) by yourself.
+
+If you want to avoid using the command-line flags, you can instead customize the variables in the CONFIGURATION section of `run-videochat.sh` before using it.
+
+By default, the script captures both video and audio. If you only want video or audio, you can use the `-v/--video` or `-a/--audio` flags respectively. You can also simply change the value of `CAPTURE_STREAM` inside `run-videochat.sh`. Make sure that IP Webcam is streaming the corresponding streams: otherwise, the script won't work!
+
+## Future work
 
 Ideas for future work:
 * switch to Python and use the official GStreamer binding. I'd love to see that, but I don't have enough free time :-(.
 * make a separated config file (system-wide and user-defined)
 
-Disclaimer: the script has only been tested in my local installation of Ubuntu 13.04 and on Arch Linux. I think it should work on most recent Debian-based distributions as well (and Debian, of course). If you need any help, please create an issue on this project.
-
-Note: the v4l2loopback-dkms package seems to be broken in Saucy (13.10), as it refers to an old v4l2loopback release (0.7.0) and not to the latest version as of date (0.8.0). Please install v4l2loopback from its official Github repo.
+If you need help with the script, feel free to add an issue. Pull requests are welcome!
