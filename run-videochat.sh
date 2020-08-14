@@ -364,7 +364,9 @@ if [ -z $SINK_ID ] ; then
                     sink_properties="device.description='IP\ Webcam'")
 fi
 
-if [ "$DISABLE_ECHO_CANCEL" = "0" -a -z $ECANCEL_ID ] ; then
+if [ $DISABLE_ECHO_CANCEL = 1 ]; then
+    :
+elif [ -z $ECANCEL_ID ] ; then
     ECANCEL_ID=$(pactl load-module module-echo-cancel \
                        sink_name="${SINK_NAME}_echo_cancel" \
                        source_master="$SINK_NAME.monitor" \
