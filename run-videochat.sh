@@ -53,6 +53,7 @@ show_help() {
     echo "Options:"
     echo " -a, --audio            capture only audio"
     echo " -b, --adb-path <path>  set adb location if not in PATH"
+    echo " -C, --no-echo-cancel   do not set up echo cancellation"
     echo " -d, --device <device>  force video device to use"
     echo " -f, --flip <flip>      flip image"
     echo " -h, --height <height>  set image height (default 480)"
@@ -184,13 +185,17 @@ SYNC=true
 # For cases when host m/c is connected to a Proxy-Server and IP belongs to local network
 DISABLE_PROXY=0
 
-OPTS=`getopt -o ab:d:f:h:l:i:p:svw:x --long audio,adb-path:,device:,flip:,height:,help,adb-flags:,use-wifi:,port:,no-sync,video,width:,no-proxy -n "$0" -- "$@"`
+# To disable echo cancellation
+DISABLE_ECHO_CANCEL=0
+
+OPTS=`getopt -o ab:Cd:f:h:l:i:p:svw:x --long audio,adb-path:,device:,flip:,height:,help,adb-flags:,use-wifi:,port:,no-sync,video,width:,no-proxy,no-echo-cancel -n "$0" -- "$@"`
 eval set -- "$OPTS"
 
 while true; do
     case "$1" in
         -a | --audio ) CAPTURE_STREAM="a"; shift;;
         -b | --adb-path ) ADB="$2"; shift 2;;
+	-C | --no-echo-cancel ) DISABLE_ECHO_CANCEL=1; shift;;
         -d | --device ) DEVICE="$2"; shift 2;;
         -f | --flip ) FLIP_METHOD="$2"; shift 2;;
         -h | --height ) HEIGHT="$2"; shift 2;;
@@ -359,7 +364,7 @@ if [ -z $SINK_ID ] ; then
                     sink_properties="device.description='IP\ Webcam'")
 fi
 
-if [ -z $ECANCEL_ID ] ; then
+if [ "$DISABLE_ECHO_CANCEL" = "0" -a -z $ECANCEL_ID ] ; then
     ECANCEL_ID=$(pactl load-module module-echo-cancel \
                        sink_name="${SINK_NAME}_echo_cancel" \
                        source_master="$SINK_NAME.monitor" \
