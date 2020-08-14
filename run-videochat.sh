@@ -8,7 +8,7 @@
 # Copyright (C) 2016 Laptander
 # Licensed under GPLv3
 
-# Usage: ./prepare-videochat.sh [flip method]
+# Usage: ./run-videochat.sh [flip method]
 #
 # [flip method] is "none" by default. Here are some values you can try
 # out (from gst/videofilter/gstvideoflip.c):
@@ -35,81 +35,6 @@
 # then while it is playing some sound, go to pavucontrol's Playback tab and choose your
 # default sound card for web-browser.
 
-#
-# INSTALLATION
-#
-# In Arch Linux
-# install ipwebcam-gst-git package from AUR
-#
-# MULTIPLE WEBCAMS
-#
-# This requires some extra work. First, you need to reload the
-# v4l2loopback module yourself and specify how many loopback devices
-# you want (default is 1). For instance, if you want 2:
-#
-#   sudo modprobe -r v4l2loopback
-#   sudo modprobe v4l2loopback exclusive_caps=1 devices=2
-#
-# Next, run two copies of this script with explicit WIFI_IP and DEVICE
-# settings (see CONFIGURATION):
-#
-#   ./prepare-videochat.sh
-#   ./prepare-videochat-copy.sh
-#
-# TROUBLESHOOTING
-#
-# 1. Does v4l2loopback work properly?
-#
-# Try running these commands. You'll first need to install mplayer and
-# ensure that your user can write to /dev/video*).
-#
-#  sudo modprobe -r v4l2loopback
-#  ls /dev/video*
-#  (Note down the devices available.)
-#  sudo modprobe v4l2loopback exclusive_caps=1
-#  ls /dev/video*
-#  (Note down the new devices: let X be the number of the first new device.)
-#  v4l2-ctl -D -d /dev/videoX
-#  gst-launch-1.0 videotestsrc ! v4l2sink device=/dev/videoX & mplayer -tv device=/dev/videoX tv://
-#
-#
-# You should be able to see the GStreamer test video source, which is
-# like a TV test card. Otherwise, there's an issue in your v4l2loopback
-# installation that you should address before using this script.
-#
-# 2. Does the video connection work properly?
-#
-# To make sure the video from IP Webcam works for you (except for
-# v4l2loopback and your video conference software), try this command
-# with a simplified pipeline (do not forget to replace $IP and $PORT
-# with your values):
-#
-# on Debian:
-#   gst-launch-1.0 souphttpsrc location="http://$IP:$PORT/videofeed" \
-#               do-timestamp=true is-live=true \
-#    ! multipartdemux ! jpegdec ! ffmpegcolorspace ! ximagesink
-#
-# on Arch Linux:
-#   gst-launch-1.0 souphttpsrc location="http://$IP:$PORT/videofeed" \
-#               do-timestamp=true is-live=true \
-#    ! multipartdemux ! jpegdec ! videoconvert ! ximagesink
-#
-# You should be able to see the picture from your webcam on a new window.
-# If that doesn't work, there's something wrong with your connection to
-# the phone.
-#
-# 3. Are you plugging several devices into your PC?
-#
-# By default, the script assumes you're only plugging one device into
-# your computer. If you're plugging in several Android devices to your
-# computer, you will first need to tell this script which one should
-# be used. Run 'adb devices' with only the desired device plugged in,
-# and note down the identifer.
-#
-# Then, uncomment the line that adds the -s flag to ADB_FLAGS below,
-# replacing 'deviceid' with the ID you just found, and run the script
-# normally.
-#
 # --
 #
 # Last tested with:
@@ -196,26 +121,6 @@ V4L2_OPTS="exclusive_caps=1 card_label=\"IP Webcam\""
 
 ### FUNCTIONS
 
-has_kernel_module() {
-    # Checks if module exists in system (but does not load it)
-    MODULE="$1"
-    if lsmod | grep -w "$MODULE" >/dev/null 2>/dev/null; then
-        # echo "$MODULE is loaded! So it exists."
-        return 0
-    else
-       # Determining kernel object existence
-       # I do not know why, but using -q in egrep makes it always return 1, so do not use it
-       if [ `find /lib/modules/$(uname -r)/ -name "$MODULE.ko*" | egrep '.*' ||
-	find /lib/modules/$(uname -r)/extra -name "$MODULE.ko*" | egrep '.*'||
-	find /lib/modules/$(uname -r)/extramodules -name "$MODULE.ko*" | egrep '.*'` ]; then
-        return 0
-       else
-        return 1
-       fi
-    fi
-
-}
-
 check_os_version() {
     # checks if the OS version can use newer GStreamer version
     DIST="$1"
@@ -253,16 +158,6 @@ can_run() {
     which "$1" >/dev/null 2>/dev/null
 }
 
-install_package() {
-    if [ $DIST = "Debian" ] || [ $DIST = "Ubuntu" ] || [ $DIST = "LinuxMint" ]; then
-        echo "Trying to install $1 package."
-        sudo apt-get install -y "$1"
-    elif [ $DIST = "Arch" ]; then
-        echo "Please install $1 package" 1>&2
-        exit 1
-    fi
-}
-
 start_adb() {
     can_run "$ADB" && "$ADB" $ADB_FLAGS start-server
 }
@@ -272,12 +167,6 @@ phone_plugged() {
 }
 
 url_reachable() {
-    if ! can_run curl && can_run apt-get; then
-        # Some versions of Ubuntu do not have curl by default (Arch
-        # has it in its core, so we don't need to check that case)
-        sudo apt-get install -y curl
-    fi
-
     CURL_OPTIONS=""
     if [ $DISABLE_PROXY = 1 ]; then
         CURL_OPTIONS="--noproxy $WIFI_IP"
@@ -290,15 +179,15 @@ url_reachable() {
 iw_server_is_started() {
     if [ $CAPTURE_STREAM = av ]; then
         : # help me optimize this code
-	      temp=$(url_reachable "$AUDIO_URL"); au=$?; #echo au=$au
-	      temp=$(url_reachable "$VIDEO_URL"); vu=$?; #echo vu=$vu
-	      if [ $au = 0 -a $vu = 0 ]; then return 0; else return 1; fi
+        temp=$(url_reachable "$AUDIO_URL"); au=$?; #echo au=$au
+        temp=$(url_reachable "$VIDEO_URL"); vu=$?; #echo vu=$vu
+        if [ $au = 0 -a $vu = 0 ]; then return 0; else return 1; fi
     elif [ $CAPTURE_STREAM = a ]; then
-	      if url_reachable "$AUDIO_URL"; then return 0; else return 1; fi
+        if url_reachable "$AUDIO_URL"; then return 0; else return 1; fi
     elif [ $CAPTURE_STREAM = v ]; then
-	      if url_reachable "$VIDEO_URL"; then return 0; else return 1; fi
+        if url_reachable "$VIDEO_URL"; then return 0; else return 1; fi
     else
-	      error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
+        error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
     fi
 }
 
@@ -312,11 +201,6 @@ start_iw_server() {
 
 module_id_by_sinkname() {
     pacmd list-sinks | grep -e 'name:' -e 'module:' | grep -A1 "name: <$1>" | grep module: | cut -f2 -d: | tr -d ' '
-}
-
-# is this function needed somewhere?
-module_id_by_sourcename() {
-    pacmd list-sources | grep -e 'name:' -e 'module:' | grep -A1 "name: <$1>" | grep module: | cut -f2 -d: | tr -d ' '
 }
 
 declare -A DISTS
@@ -351,10 +235,6 @@ GST_1_0_AUDIO_FORMAT="format=S16LE"
 GST_0_10_VIDEO_MIMETYPE=$GST_VIDEO_MIMETYPE
 GST_0_10_VIDEO_FORMAT=$GST_VIDEO_FORMAT
 
-if ! can_run bc; then
-    install_package bc
-fi
-
 set +e
 check_os_version $DIST $RELEASE
 set -e
@@ -384,49 +264,16 @@ GST_DEBUG=souphttpsrc:0,videoflip:0,$GST_CONVERTER:0,v4l2sink:0,pulse:0
 ### MAIN BODY
 
 
-if ! can_run zenity; then
-    install_package zenity
-fi
-
-# Check if the user has v4l2loopback
-if ! has_kernel_module v4l2loopback; then
-    if [ $DIST = "Debian" ] || [ $DIST = "Ubuntu" ] || [ $DIST = "Arch" ]; then
-        install_package "v4l2loopback-dkms"
-        if [ $DIST = "Ubuntu" ]; then
-           install_package "python-apport"
-        fi
-
-        if [ $? != 0 ]; then
-            info "Installation failed.  Please install v4l2loopback manually from github.com/umlaeute/v4l2loopback."
-        fi
-    fi
-
-    if has_kernel_module v4l2loopback; then
-        info "The v4l2loopback kernel module was installed successfully."
-    else
-        error "Could not install the v4l2loopback kernel module through apt-get."
-    fi
-fi
-
 # Probe module if not probed yet
 if lsmod | grep -w v4l2loopback >/dev/null 2>/dev/null; then
     # module is already loaded, do nothing
     :
 elif [ $CAPTURE_STREAM = v -o $CAPTURE_STREAM = av ]; then
-    echo Loading module
-    sudo modprobe v4l2loopback $V4L2_OPTS #-q > /dev/null 2>&1
-fi
-
-# check if the user has the pulse gst plugin installed
-if find "/usr/lib/gstreamer-$GST_VER/libgstpulseaudio.so" "/usr/lib/gstreamer-$GST_VER/libgstpulse.so" "/usr/lib/$(uname -m)-linux-gnu/gstreamer-$GST_VER/libgstpulse.so" 2>/dev/null | egrep -q '.*'; then
-    # plugin installed, do nothing
-    # info "Found the pulse gst plugin"
-    :
-else
-    if [ $DIST = "Debian" ] || [ $DIST = "Ubuntu" ]; then
-        install_package "gstreamer${GST_VER}-pulseaudio"
-    elif [ $DIST = "Arch" ]; then
-        install_package "gst-plugins-good"
+    if can_run sudo; then
+        echo Loading module
+        sudo modprobe v4l2loopback $V4L2_OPTS #-q > /dev/null 2>&1
+    else
+        echo Load module with \"modprobe v4l2loopback $V4L2_OPTS\"
     fi
 fi
 
@@ -434,21 +281,18 @@ fi
 # through DEVICE, use the first "v4l2 loopback" device as the webcam:
 # this should help when loading v4l2loopback on a system that already
 # has a regular webcam. If that doesn't work, fall back to /dev/video0.
-if ! can_run v4l2-ctl; then
-    install_package v4l-utils
-fi
 if [ -z "$DEVICE" ]; then
     if can_run v4l2-ctl; then
-	      for d in /dev/video*; do
+        for d in /dev/video*; do
             if v4l2-ctl -d "$d" -D | grep -q "v4l2 loopback"; then
-		            DEVICE=$d
-		            break
+                DEVICE=$d
+                break
             fi
-	      done
+        done
     fi
     if [ -z "$DEVICE" ]; then
-	      DEVICE=/dev/video0
-	      warning "Could not find the v4l2loopback device: falling back to $DEVICE"
+        DEVICE=/dev/video0
+        warning "Could not find the v4l2loopback device: falling back to $DEVICE"
     fi
 fi
 
@@ -496,13 +340,13 @@ fi
 
 while ! iw_server_is_started; do
     if [ $CAPTURE_STREAM = av ]; then
-	      MESSAGE="The IP Webcam audio feed is not reachable at <a href=\"$AUDIO_URL\">$AUDIO_URL</a>.\nThe IP Webcam video feed is not reachable at <a href=\"$VIDEO_URL\">$VIDEO_URL</a>."
+        MESSAGE="The IP Webcam audio feed is not reachable at <a href=\"$AUDIO_URL\">$AUDIO_URL</a>.\nThe IP Webcam video feed is not reachable at <a href=\"$VIDEO_URL\">$VIDEO_URL</a>."
     elif [ $CAPTURE_STREAM = a ]; then
-	      MESSAGE="The IP Webcam audio feed is not reachable at <a href=\"$AUDIO_URL\">$AUDIO_URL</a>."
+        MESSAGE="The IP Webcam audio feed is not reachable at <a href=\"$AUDIO_URL\">$AUDIO_URL</a>."
     elif [ $CAPTURE_STREAM = v ]; then
-	      MESSAGE="The IP Webcam video feed is not reachable at <a href=\"$VIDEO_URL\">$VIDEO_URL</a>."
+        MESSAGE="The IP Webcam video feed is not reachable at <a href=\"$VIDEO_URL\">$VIDEO_URL</a>."
     else
-	      error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
+        error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
     fi
     info "$MESSAGE\nPlease install and open IP Webcam in your phone and start the server.\nMake sure that values of variables IP, PORT, CAPTURE_STREAM in this script are equal with settings in IP Webcam."
 done
@@ -539,15 +383,6 @@ pactl set-default-source $SINK_NAME.monitor
 
 # Check for gst-launch
 GSTLAUNCH=gst-launch-${GST_VER}
-if [ $DIST = "Debian" ] || [ $DIST = "Ubuntu" ]; then
-    if ! can_run "$GSTLAUNCH"; then
-        install_package gstreamer${GST_VER}-tools
-    fi
-elif  [ $DIST = "Arch" ]; then
-    if ! can_run "$GSTLAUNCH"; then
-        error "You don't have gst-launch. Please install gstreamer and gst-plugins-good packages."
-    fi
-fi
 if ! can_run "$GSTLAUNCH"; then
     error "Could not find gst-launch. Exiting."
     # exit 1 # you have already exited after error function.
