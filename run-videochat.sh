@@ -276,6 +276,7 @@ elif [ $CAPTURE_STREAM = v -o $CAPTURE_STREAM = av ]; then
     if can_run sudo; then
         echo Loading module
         sudo modprobe v4l2loopback $V4L2_OPTS #-q > /dev/null 2>&1
+        sleep .05
     else
         echo Load module with \"modprobe v4l2loopback $V4L2_OPTS\"
     fi
