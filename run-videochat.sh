@@ -345,37 +345,39 @@ if ! iw_server_is_started; then
     error "$MESSAGE\nPlease install and open IP Webcam in your phone and start the server.\nMake sure that values of variables IP, PORT, CAPTURE_STREAM in this script are equal with settings in IP Webcam."
 fi
 
-# idea: check if default-source is correct. If two copy of script are running,
-# then after ending first before second you will be set up with $SINK_NAME.monitor,
-# but not with your original defauld source.
-# The same issue if script was not end correctly, and you restart it.
-DEFAULT_SINK=$(pacmd dump | grep set-default-sink | cut -f2 -d " ")
-DEFAULT_SOURCE=$(pacmd dump | grep set-default-source | cut -f2 -d " ")
+if [ $CAPTURE_STREAM = a -o $CAPTURE_STREAM = av ]; then
+    # idea: check if default-source is correct. If two copy of script are running,
+    # then after ending first before second you will be set up with $SINK_NAME.monitor,
+    # but not with your original defauld source.
+    # The same issue if script was not end correctly, and you restart it.
+    DEFAULT_SINK=$(pacmd dump | grep set-default-sink | cut -f2 -d " ")
+    DEFAULT_SOURCE=$(pacmd dump | grep set-default-source | cut -f2 -d " ")
 
-SINK_NAME="ipwebcam"
-SINK_ID=$(module_id_by_sinkname $SINK_NAME)
-ECANCEL_ID=$(module_id_by_sinkname "${SINK_NAME}_echo_cancel")
+    SINK_NAME="ipwebcam"
+    SINK_ID=$(module_id_by_sinkname $SINK_NAME)
+    ECANCEL_ID=$(module_id_by_sinkname "${SINK_NAME}_echo_cancel")
 
-# Registering audio device if not yet registered
-if [ -z $SINK_ID ] ; then
-    SINK_ID=$(pactl load-module module-null-sink \
-                    sink_name="$SINK_NAME" \
-                    $PA_AUDIO_CAPS \
-                    sink_properties="device.description='IP\ Webcam'")
+    # Registering audio device if not yet registered
+    if [ -z $SINK_ID ] ; then
+        SINK_ID=$(pactl load-module module-null-sink \
+                sink_name="$SINK_NAME" \
+                $PA_AUDIO_CAPS \
+                sink_properties="device.description='IP\ Webcam'")
+    fi
+
+    if [ $DISABLE_ECHO_CANCEL = 1 ]; then
+        :
+    elif [ -z $ECANCEL_ID ] ; then
+        ECANCEL_ID=$(pactl load-module module-echo-cancel \
+                   sink_name="${SINK_NAME}_echo_cancel" \
+                   source_master="$SINK_NAME.monitor" \
+                   sink_master="$DEFAULT_SINK" \
+                   $PA_AUDIO_CAPS \
+                   aec_method="webrtc" save_aec=true use_volume_sharing=true) || true
+    fi
+
+    pactl set-default-source $SINK_NAME.monitor
 fi
-
-if [ $DISABLE_ECHO_CANCEL = 1 ]; then
-    :
-elif [ -z $ECANCEL_ID ] ; then
-    ECANCEL_ID=$(pactl load-module module-echo-cancel \
-                       sink_name="${SINK_NAME}_echo_cancel" \
-                       source_master="$SINK_NAME.monitor" \
-                       sink_master="$DEFAULT_SINK" \
-                       $PA_AUDIO_CAPS \
-                       aec_method="webrtc" save_aec=true use_volume_sharing=true) || true
-fi
-
-pactl set-default-source $SINK_NAME.monitor
 
 # Check for gst-launch
 GSTLAUNCH=gst-launch-${GST_VER}
@@ -451,9 +453,11 @@ echo "Press enter to end stream"
 read
 
 kill $GSTLAUNCH_PID > /dev/null 2>&1 || echo ""
-pactl set-default-source ${DEFAULT_SOURCE}
-pactl unload-module ${ECANCEL_ID}
-pactl unload-module ${SINK_ID}
+if [ $CAPTURE_STREAM = a -o $CAPTURE_STREAM = av ]; then
+    pactl set-default-source ${DEFAULT_SOURCE}
+    pactl unload-module ${ECANCEL_ID}
+    pactl unload-module ${SINK_ID}
+fi
 
 # Remove the port forwarding, to avoid issues on the next run
 if [ $MODE = adb ]; then "$ADB" $ADB_FLAGS forward --remove tcp:$PORT; fi
