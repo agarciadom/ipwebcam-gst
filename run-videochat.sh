@@ -41,7 +41,9 @@
 # - souphttpsrc version 1.0.6
 # - v4l2sink version 1.0.6
 # - v4l2loopback version 0.7.0
-
+#to fix no pulseaudio daemon running in arch/manjaro
+killall pulseaudio
+pulseaudio -D
 ### FUNCTIONS
 
 show_help() {
@@ -320,7 +322,10 @@ if [ -z $IP ]; then
         error "adb is available, but the phone is not plugged in.\nConnect your phone to USB and allow usb debugging under developer settings or use Wi-Fi (slower)."
     fi
     if ss -ln src :$PORT | grep -q :$PORT; then
-        error "Your port $PORT seems to be in use: try using Wi-Fi.\nIf you would like to use USB forwarding, please free it up and try again."
+	killall adb
+	if ss -ln src :$PORT | grep -q :$PORT; then
+		error "Your port $PORT seems to be in use: try using Wi-Fi.\nIf you would like to use USB forwarding, please free it up and try again."
+	fi
     fi
     "$ADB" $ADB_FLAGS forward tcp:$PORT tcp:$PORT
     IP=127.0.0.1
