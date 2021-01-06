@@ -84,7 +84,7 @@ check_os_version() {
 
 error() {
     zenity --error --no-wrap --text "$@" > /dev/null 2>&1
-    adb forward --remove tcp:8080
+    adb forward --remove tcp:$PORT
     exit 1
 }
 
