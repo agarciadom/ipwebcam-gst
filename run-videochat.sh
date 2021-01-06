@@ -84,6 +84,7 @@ check_os_version() {
 
 error() {
     zenity --error --no-wrap --text "$@" > /dev/null 2>&1
+    adb forward --remove tcp:8080
     exit 1
 }
 
@@ -313,11 +314,11 @@ fi
 if [ -z $IP ]; then
     # start adb daemon to avoid relaunching it in while
     if ! can_run "$ADB"; then
-        error "adb is not available: you'll have to use Wi-Fi, which will be slower.\nNext time, please install the Android SDK from developer.android.com/sdk or install adb package."
+        warning "adb is not available: you'll have to use Wi-Fi, which will be slower.\nNext time, please install the Android SDK from developer.android.com/sdk or install adb package."
     fi
     start_adb
     if ! phone_plugged; then
-        error "adb is available, but the phone is not plugged in.\nConnect your phone to USB and allow usb debugging under developer settings or use Wi-Fi (slower)."
+        warning "adb is available, but the phone is not plugged in.\nConnect your phone to USB and allow usb debugging under developer settings or use Wi-Fi (slower)."
     fi
     if ss -ln src :$PORT | grep -q :$PORT; then
         error "Your port $PORT seems to be in use: try using Wi-Fi.\nIf you would like to use USB forwarding, please free it up and try again."
