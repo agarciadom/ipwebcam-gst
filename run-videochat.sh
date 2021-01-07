@@ -84,7 +84,6 @@ check_os_version() {
 
 error() {
     zenity --error --no-wrap --text "$@" > /dev/null 2>&1
-    adb forward --remove tcp:$PORT
     exit 1
 }
 
@@ -98,6 +97,16 @@ info() {
 
 confirm() {
     zenity --question --no-wrap --text "$@" > /dev/null 2>&1
+}
+
+error_port() {
+    zenity --error --no-wrap --text "$@" > /dev/null 2>&1
+    zenity --question --no-wrap --text="Do you want to clear port $PORT?"> /dev/null 2>&1
+    if [ $? = 0 ]; then
+        adb forward --remove tcp:$PORT
+    else
+        exit 1
+    fi
 }
 
 can_run() {
@@ -139,7 +148,7 @@ iw_server_is_started() {
 }
 
 module_id_by_sinkname() {
-    pacmd list-sinks | grep -e 'name:' -e 'module:' | grep -A1 "name: <$1>" | grep module: | cut -f2 -d: | tr -d ' '
+    pactl list sinks | grep -e "Name:" -e "Module:" |grep -A1 "Name: $1" | grep Module: | cut -f2 -d: | tr -d ' '
 }
 
 ### CONFIGURATION
@@ -314,14 +323,15 @@ fi
 if [ -z $IP ]; then
     # start adb daemon to avoid relaunching it in while
     if ! can_run "$ADB"; then
-        warning "adb is not available: you'll have to use Wi-Fi, which will be slower.\nNext time, please install the Android SDK from developer.android.com/sdk or install adb package."
+        error "adb is not available: you'll have to use Wi-Fi, which will be slower.\nNext time, please install the Android SDK from developer.android.com/sdk or install adb package."
     fi
     start_adb
     if ! phone_plugged; then
-        warning "adb is available, but the phone is not plugged in.\nConnect your phone to USB and allow usb debugging under developer settings or use Wi-Fi (slower)."
+        error "adb is available, but the phone is not plugged in.\nConnect your phone to USB and allow usb debugging under developer settings or use Wi-Fi (slower)."
     fi
     if ss -ln src :$PORT | grep -q :$PORT; then
-        error "Your port $PORT seems to be in use: try using Wi-Fi.\nIf you would like to use USB forwarding, please free it up and try again."
+        error_port "Your port $PORT seems to be in use: try using Wi-Fi.\nIf you would like to use USB forwarding, please free it up and try again."
+        
     fi
     "$ADB" $ADB_FLAGS forward tcp:$PORT tcp:$PORT
     IP=127.0.0.1
@@ -347,13 +357,23 @@ if ! iw_server_is_started; then
     error "$MESSAGE\nPlease install and open IP Webcam in your phone and start the server.\nMake sure that values of variables IP, PORT, CAPTURE_STREAM in this script are equal with settings in IP Webcam."
 fi
 
+# Test if audio server is running on pipewire
+if pactl info | grep -q PipeWire; then
+    if [ "$CAPTURE_STREAM" = v ]; then
+        :
+    else
+    # currently setting audio sinks errors out, so give user a workaround
+        error "Only video streams on Pipewire are currently supported. Audio is a WIP. Please set CAPTURE_STREAM value to v."
+    fi
+fi
+
 if [ $CAPTURE_STREAM = a -o $CAPTURE_STREAM = av ]; then
     # idea: check if default-source is correct. If two copy of script are running,
     # then after ending first before second you will be set up with $SINK_NAME.monitor,
     # but not with your original defauld source.
     # The same issue if script was not end correctly, and you restart it.
-    DEFAULT_SINK=$(pacmd dump | grep set-default-sink | cut -f2 -d " ")
-    DEFAULT_SOURCE=$(pacmd dump | grep set-default-source | cut -f2 -d " ")
+    DEFAULT_SINK=$(pactl info | grep "Sink" | cut -f3 -d " ")
+    DEFAULT_SOURCE=$(pactl info | grep "Source" | cut -f3 -d " ")
 
     SINK_NAME="ipwebcam"
     SINK_ID=$(module_id_by_sinkname $SINK_NAME)
