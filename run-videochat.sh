@@ -3,7 +3,7 @@
 # Script for using IP Webcam as a microphone/webcam in Debian Jessie,
 # Ubuntu 13.04, 14.04, 16.04 and Arch Linux
 
-# Copyright (C) 2011-2020 Antonio García Domínguez
+# Copyright (C) 2011-2021 Antonio García Domínguez
 # Copyright (C) 2016 C.J. Adams-Collier
 # Copyright (C) 2016 Laptander
 # Licensed under GPLv3
@@ -187,6 +187,10 @@ DISABLE_PROXY=0
 
 # To disable echo cancellation
 DISABLE_ECHO_CANCEL=0
+
+# Use exclusive caps by default (required by Chrome, Cheese and others)
+V4L2_OPTS="exclusive_caps=1"
+
 
 OPTS=`getopt -o ab:Cd:f:h:l:i:p:svw:x --long audio,adb-path:,device:,flip:,height:,help,adb-flags:,use-wifi:,port:,no-sync,video,width:,no-proxy,no-echo-cancel -n "$0" -- "$@"`
 eval set -- "$OPTS"
