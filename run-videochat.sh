@@ -172,7 +172,8 @@ ADB_FLAGS=
 # set on command line
 FLIP_METHOD=
 
-# Default dimensions of video, can be ovverrided on command line.
+# Default dimensions of video, can be overridden on command line.
+# Make sure both dimensions are multiples of 16 (see issue #97).
 WIDTH=640
 HEIGHT=480
 
