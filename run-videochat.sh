@@ -323,8 +323,17 @@ if [ -z $IP ]; then
     if ! phone_plugged; then
         error "adb is available, but the phone is not plugged in.\nConnect your phone to USB and allow usb debugging under developer settings or use Wi-Fi (slower)."
     fi
-    if ss -ln src :$PORT | grep -q :$PORT; then
-        error "Your port $PORT seems to be in use: try using Wi-Fi.\nIf you would like to use USB forwarding, please free it up and try again."
+    if ss -ln src ":$PORT" | grep -q ":$PORT"; then
+        PIDOF_ADB="$(pidof adb)"
+        if test -n "$PIDOF_ADB" && ss -lptn ":$PORT" | grep "pid=${PIDOF_ADB}"; then
+            if confirm "Your port $PORT seems to be in use by ADB: would you like to clear the previous port before continuing?"; then
+                adb forward --remove tcp:$PORT
+            else
+                exit 1
+            fi
+        else
+            error "Your port $PORT seems to be in use: try using Wi-Fi.\nIf you would like to use USB forwarding, please free it up and try again."
+        fi
     fi
     "$ADB" $ADB_FLAGS forward tcp:$PORT tcp:$PORT
     IP=127.0.0.1
