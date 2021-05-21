@@ -344,7 +344,7 @@ else
 fi
 
 BASE_URL=http://$IP:$PORT
-VIDEO_URL=$BASE_URL/videofeed
+VIDEO_URL=$BASE_URL/video
 AUDIO_URL=$BASE_URL/audio.$AUDIO_CODEC
 
 if ! iw_server_is_started; then
