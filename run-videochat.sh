@@ -453,7 +453,7 @@ pipeline_video() {
 }
 
 pipeline_audio() {
-  echo souphttpsrc location="$AUDIO_URL" do-timestamp=true is-live=true \
+  echo souphttpsrc location="$AUDIO_URL" do-timestamp=true is-live=true user-id="$USERNAME" user-pw="$PASSWORD" \
     ! $GST_AUDIO_CAPS ! queue \
     ! pulsesink device="$SINK_NAME" sync=$SYNC
 }
