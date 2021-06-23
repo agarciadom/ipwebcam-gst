@@ -60,8 +60,10 @@ show_help() {
     echo " -l, --adb-flags <id>   adb flags to specify device id"
     echo " -i, --use-wifi <ip>    use wi-fi mode with specified ip"
     echo " -p, --port <port>      port on which IP Webcam is listening (default 8080)"
+    echo " -P, --password <pass>  password for accesing the IP Webcam"
     echo " -s, --no-sync          No force syncing to timestamps"
     echo " -t, --with-tee         adds the 'tee' multiplexer to the pipeline, to workaround 'single-frame' capture issue (see issue #97)"
+    echo " -u, --username <user>  username for accesing the IP Webcam"
     echo " -v, --video            capture only video"
     echo " -w, --width <width>    set image width (default 640)"
     echo " -x, --no-proxy         disable proxy while acessing IP"
@@ -115,9 +117,12 @@ phone_plugged() {
 url_reachable() {
     CURL_OPTIONS=""
     if [ $DISABLE_PROXY = 1 ]; then
-        CURL_OPTIONS="--noproxy $IP"
+        CURL_OPTIONS+="--noproxy $IP "
     fi
 
+    if [[ $USERNAME != "" && $PASSWORD != "" ]]; then
+        CURL_OPTIONS+="-u $USERNAME:$PASSWORD"
+    fi
     # -f produces a non-zero status code when answer is 4xx or 5xx
     curl $CURL_OPTIONS -f -m 5 -sI "$1" >/dev/null
 }
@@ -192,8 +197,10 @@ DISABLE_ECHO_CANCEL=0
 # Use exclusive caps by default (required by Chrome, Cheese and others)
 V4L2_OPTS="exclusive_caps=1"
 
+USERNAME=""
+PASSWORD=""
 
-OPTS=`getopt -o ab:Cd:f:h:l:i:p:stvw:x --long audio,adb-path:,device:,flip:,height:,help,adb-flags:,use-wifi:,port:,no-sync,with-tee,video,width:,no-proxy,no-echo-cancel -n "$0" -- "$@"`
+OPTS=`getopt -o ab:Cd:f:h:l:i:p:P:stu:vw:x --long audio,adb-path:,device:,flip:,height:,help,adb-flags:,use-wifi:,port:,password:,no-sync,with-tee,username:,video,width:,no-proxy,no-echo-cancel -n "$0" -- "$@"`
 eval set -- "$OPTS"
 
 while true; do
@@ -207,11 +214,14 @@ while true; do
         -l | --adb-flags ) ADB_FLAGS="-s $2"; shift 2;;
         -i | --use-wifi ) IP="$2"; shift 2;;
         -p | --port ) PORT="$2"; shift 2;;
+        -P | --password) PASSWORD="$2"; shift 2;;
+        -u | --username) USERNAME="$2"; shift 2;;
         -s | --no-sync ) SYNC=false; shift;;
         -t | --with-tee ) USE_TEE=true; shift;;
         -v | --video ) CAPTURE_STREAM="v"; shift;;
         -w | --width ) WIDTH="$2"; shift 2;;
         -x | --no-proxy) DISABLE_PROXY=1; shift;;
+        
         --help) show_help; exit; shift;;
         -- ) shift; break;;
         * ) echo "Internal error!" ; exit 1 ;;
@@ -430,7 +440,7 @@ pipeline_video() {
         GST_TEE="! tee "
     fi
 
-    echo souphttpsrc location="$VIDEO_URL" do-timestamp=true is-live=true \
+    echo souphttpsrc location="$VIDEO_URL" do-timestamp=true is-live=true user-id="$USERNAME" user-pw="$PASSWORD" \
       ! queue \
       ! multipartdemux \
       ! decodebin \
