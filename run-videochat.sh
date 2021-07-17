@@ -193,7 +193,7 @@ DISABLE_ECHO_CANCEL=0
 V4L2_OPTS="exclusive_caps=1"
 
 
-OPTS=`getopt -o ab:Cd:f:h:l:i:p:svw:x --long audio,adb-path:,device:,flip:,height:,help,adb-flags:,use-wifi:,port:,no-sync,video,width:,no-proxy,no-echo-cancel -n "$0" -- "$@"`
+OPTS=`getopt -o ab:Cd:f:h:l:i:p:stvw:x --long audio,adb-path:,device:,flip:,height:,help,adb-flags:,use-wifi:,port:,no-sync,with-tee,video,width:,no-proxy,no-echo-cancel -n "$0" -- "$@"`
 eval set -- "$OPTS"
 
 while true; do
@@ -208,6 +208,7 @@ while true; do
         -i | --use-wifi ) IP="$2"; shift 2;;
         -p | --port ) PORT="$2"; shift 2;;
         -s | --no-sync ) SYNC=false; shift;;
+        -t | --with-tee ) USE_TEE=true; shift;;
         -v | --video ) CAPTURE_STREAM="v"; shift;;
         -w | --width ) WIDTH="$2"; shift 2;;
         -x | --no-proxy) DISABLE_PROXY=1; shift;;
@@ -417,8 +418,12 @@ set +e
 
 pipeline_video() {
     GST_FLIP=""
+    GST_TEE=""
     if [ $FLIP_METHOD ]; then
         GST_FLIP="! videoflip method=\"$FLIP_METHOD\" "
+    fi
+    if [ "$USE_TEE" = "true" ]; then
+        GST_TEE="! tee "
     fi
 
     echo souphttpsrc location="$VIDEO_URL" do-timestamp=true is-live=true \
@@ -429,6 +434,7 @@ pipeline_video() {
       ! $GST_VIDEO_CONVERTER \
       ! videoscale \
       ! $GST_VIDEO_CAPS \
+      $GST_TEE \
       ! v4l2sink device="$DEVICE" sync=$SYNC
 }
 
