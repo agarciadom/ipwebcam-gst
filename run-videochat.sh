@@ -61,6 +61,7 @@ show_help() {
     echo " -i, --use-wifi <ip>    use wi-fi mode with specified ip"
     echo " -p, --port <port>      port on which IP Webcam is listening (default 8080)"
     echo " -s, --no-sync          No force syncing to timestamps"
+    echo " -t, --with-tee         adds the 'tee' multiplexer to the pipeline, to workaround 'single-frame' capture issue (see issue #97)"
     echo " -v, --video            capture only video"
     echo " -w, --width <width>    set image width (default 640)"
     echo " -x, --no-proxy         disable proxy while acessing IP"
@@ -422,6 +423,10 @@ pipeline_video() {
     if [ $FLIP_METHOD ]; then
         GST_FLIP="! videoflip method=\"$FLIP_METHOD\" "
     fi
+    # Due to what seems an issue between v4l2loopback and gst-1.0 (https://github.com/umlaeute/v4l2loopback/issues/83),
+    # the pipeline might need the "tee" multiplexer to enforce an additional buffer copy.
+    # Here we enable it if the user explicitly asked to.
+    # TODO: consider automatically enabling this if using gst-1.0 and specific version ranges of v4l2loopback.
     if [ "$USE_TEE" = "true" ]; then
         GST_TEE="! tee "
     fi
