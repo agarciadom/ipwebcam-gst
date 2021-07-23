@@ -117,7 +117,7 @@ phone_plugged() {
 url_reachable() {
     CURL_OPTIONS=""
     if [ $DISABLE_PROXY = 1 ]; then
-        CURL_OPTIONS+="--noproxy $IP "
+        CURL_OPTIONS+="--noproxy $IP"
     fi
 
     if [[ $USERNAME != "" && $PASSWORD != "" ]]; then
@@ -221,7 +221,6 @@ while true; do
         -v | --video ) CAPTURE_STREAM="v"; shift;;
         -w | --width ) WIDTH="$2"; shift 2;;
         -x | --no-proxy) DISABLE_PROXY=1; shift;;
-        
         --help) show_help; exit; shift;;
         -- ) shift; break;;
         * ) echo "Internal error!" ; exit 1 ;;
