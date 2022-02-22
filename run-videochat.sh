@@ -67,7 +67,6 @@ show_help() {
     echo " -x, --no-proxy         disable proxy while acessing IP"
     echo "     --help             show this help"
 }
-
 check_os_version() {
     # checks if the OS version can use newer GStreamer version
     DIST="$1"
@@ -328,7 +327,8 @@ if [ -z $IP ]; then
     fi
     if ss -ln src ":$PORT" | grep -q ":$PORT"; then
         PIDOF_ADB="$(pidof adb)"
-        if test -n "$PIDOF_ADB" && ss -lptn ":$PORT" | grep "pid=${PIDOF_ADB}"; then
+        HAS_PORT_USED_BY_ADB="$(ss -lptn | grep ":$PORT" | grep "adb" | grep "pid=${PIDOF_ADB}")"
+        if test -n "$HAS_PORT_USED_BY_ADB"; then
             if confirm "Your port $PORT seems to be in use by ADB: would you like to clear the previous port before continuing?"; then
                 adb forward --remove tcp:$PORT
             else
