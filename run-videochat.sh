@@ -200,14 +200,14 @@ V4L2_OPTS="exclusive_caps=1"
 USERNAME=""
 PASSWORD=""
 
-OPTS=`getopt -o ab:Cd:f:h:l:i:p:P:stu:vw:x --long audio,adb-path:,device:,flip:,height:,help,adb-flags:,use-wifi:,port:,password:,no-sync,with-tee,username:,video,width:,no-proxy,no-echo-cancel -n "$0" -- "$@"`
+OPTS=`getopt -o ab:Cd:f:h:l:i:p:P:stu:vw:x --long audio,adb-path:,no-echo-cancel,device:,flip:,height:,help,adb-flags:,use-wifi:,port:,password:,no-sync,with-tee,username:,video,width:,no-proxy -n "$0" -- "$@"`
 eval set -- "$OPTS"
 
 while true; do
     case "$1" in
         -a | --audio ) CAPTURE_STREAM="a"; shift;;
         -b | --adb-path ) ADB="$2"; shift 2;;
-	-C | --no-echo-cancel ) DISABLE_ECHO_CANCEL=1; shift;;
+	    -C | --no-echo-cancel ) DISABLE_ECHO_CANCEL=1; shift;;
         -d | --device ) DEVICE="$2"; shift 2;;
         -f | --flip ) FLIP_METHOD="$2"; shift 2;;
         -h | --height ) HEIGHT="$2"; shift 2;;
