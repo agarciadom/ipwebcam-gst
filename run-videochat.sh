@@ -67,7 +67,6 @@ show_help() {
     echo " -x, --no-proxy         disable proxy while acessing IP"
     echo "     --help             show this help"
 }
-
 check_os_version() {
     # checks if the OS version can use newer GStreamer version
     DIST="$1"
@@ -139,7 +138,7 @@ iw_server_is_started() {
 }
 
 module_id_by_sinkname() {
-    pactl list sinks | grep -e "Name:" -e "Module:" |grep -A1 "Name: $1" | grep Module: | cut -f2 -d: | tr -d ' '
+    pactl list sinks | grep -e "Name:" -e "Module:" |grep -A1 "Name: $1$" | grep Module: | cut -f2 -d: | tr -d ' '
 }
 
 ### CONFIGURATION
