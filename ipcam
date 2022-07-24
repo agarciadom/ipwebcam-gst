@@ -160,7 +160,7 @@ killer(){
     do
         printf "${DEVICE_PATH}  "
         . $DEVICE_PATH
-        rm "$DEVICE_PATH"
+        rm -f "$DEVICE_PATH"
         kill $GSTLAUNCH_PID > /dev/null 2>&1 || printf ""
         if [ $CAPTURE_STREAM = a -o $CAPTURE_STREAM = av ]; then
             pactl set-default-source ${DEFAULT_SOURCE} >> /dev/null 2>&1 || printf ""
@@ -229,8 +229,6 @@ V4L2_OPTS="exclusive_caps=1"
 USERNAME=""
 PASSWORD=""
 
-KILL=0
-
 OPTS=`getopt -o ab:Cd:f:h:kl:i:p:P:stu:vw:x --long audio,adb-path:,no-echo-cancel,device:,flip:,height:,help,adb-flags:,use-wifi:,port:,password:,no-sync,with-tee,username:,video,width:,no-proxy,kill -n "$0" -- "$@"`
 eval set -- "$OPTS"
 
@@ -264,8 +262,9 @@ while true; do
     esac
 done
 
-[ $KILL == 1 ] && killer
-[ $FLIP_METHOD == "help" ] && echo "$FLIP_HELP" && exit 0
+[[ $KILL == 1 ]] && killer
+[[ $FLIP_METHOD == "help" ]] && echo "$FLIP_HELP" && exit 0
+
 
 declare -A DISTS
 DISTS=(["Debian"]=1 ["Ubuntu"]=2 ["Arch"]=3 ["LinuxMint"]=4)
@@ -521,7 +520,7 @@ if [ ! -d "/var/tmp/camera" ]; then mkdir -p "/var/tmp/camera"; fi
 "$GSTLAUNCH" -e -vt --gst-plugin-spew \
              --gst-debug="$GST_DEBUG" \
     $PIPELINE \
-    >/var/tmp/camera/feed-"$(date)".log 2>&1 &
+    >/var/tmp/camera/feed-"$(date +%s)".log 2>&1 &
     # Maybe we need edit this pipeline to transfer it to "Monitor of IP Webcam" to be able to use it as a microphone?
 
 GSTLAUNCH_PID=$!
