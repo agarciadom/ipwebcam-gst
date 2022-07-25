@@ -167,6 +167,7 @@ killer(){
             pactl set-default-source ${DEFAULT_SOURCE} >> /dev/null 2>&1 || printf ""
             pactl unload-module ${ECANCEL_ID} >> /dev/null 2>&1 || printf ""
             pactl unload-module ${SINK_ID} >> /dev/null 2>&1 || printf ""
+            pactl unload-module ${SOURCE_ID} >> /dev/null 2>&1 || printf ""
         fi
 
         # Remove the port forwarding, to avoid issues on the next run
@@ -410,15 +411,10 @@ if ! iw_server_is_started; then
     error "$MESSAGE\nPlease install and open IP Webcam in your phone and start the server.\nMake sure that values of variables IP, PORT, CAPTURE_STREAM in this script are equal with settings in IP Webcam."
 fi
 
-# Test if audio server is running on pipewire
-if ! $(pactl info | grep -q PulseAudio); then
-    if [ "$CAPTURE_STREAM" = v ]; then
-        :
-    else
-    # currently setting audio sinks errors out, so give user a workaround
-        info "Audio streaming are only implemented with PulseAudio. The script will running with -v."
-        CAPTURE_STREAM=v
-    fi
+# Test if audio server is running on PulseAudio
+if [[ ! "$CAPTURE_STREAM" == v ]] && ! $(pactl info | grep -q PulseAudio); then
+    info "Audio streaming are only implemented with PulseAudio. The script will be running with -v."
+    CAPTURE_STREAM=v
 fi
 
 if [ $CAPTURE_STREAM = a -o $CAPTURE_STREAM = av ]; then
@@ -431,28 +427,38 @@ if [ $CAPTURE_STREAM = a -o $CAPTURE_STREAM = av ]; then
 
     SINK_NAME="ipwebcam"
     SINK_ID=$(module_id_by_sinkname $SINK_NAME)
-    ECANCEL_ID=$(module_id_by_sinkname "${SINK_NAME}_echo_cancel")
+    ECANCEL_ID=$(module_id_by_sinkname "${SINK_NAME}-EchoFree.sink")
 
     # Registering audio device if not yet registered
     if [ -z $SINK_ID ] ; then
         SINK_ID=$(pactl load-module module-null-sink \
                 sink_name="$SINK_NAME" \
                 $PA_AUDIO_CAPS \
-                sink_properties="device.description='IP\ Webcam'")
+                sink_properties="device.description='IPWebCam.AudioSink'")
+        
+        SOURCE_ID=$(pactl load-module module-remap-source \
+                source_name="${SINK_NAME}-Source" \
+                $PA_AUDIO_CAPS \
+                master="${SINK_NAME}.monitor" \
+                source_properties="device.description='IPWebCam.Microphone'")
+            pactl set-default-source ${SINK_NAME}.monitor
     fi
 
     if [ $DISABLE_ECHO_CANCEL = 1 ]; then
         :
     elif [ -z $ECANCEL_ID ] ; then
         ECANCEL_ID=$(pactl load-module module-echo-cancel \
-                   sink_name="${SINK_NAME}_echo_cancel" \
-                   source_master="$SINK_NAME.monitor" \
-                   sink_master="$DEFAULT_SINK" \
-                   $PA_AUDIO_CAPS \
-                   aec_method="webrtc" save_aec=true use_volume_sharing=true) || true
+                    source_name="${SINK_NAME}-EchoFree" \
+                    source_properties="device.description='IPWebCam.Microphone.EchoFree'" \
+                    sink_name="${SINK_NAME}-EchoFree.sink" \
+                    sink_properties="device.description='IPWebCam.AudioSink.EchoFree'" \
+                    source_master="$SINK_NAME.monitor" \
+                    sink_master="$DEFAULT_SINK" \
+                    $PA_AUDIO_CAPS \
+                    aec_method="webrtc" save_aec=true use_volume_sharing=true) || true
+        pactl set-default-source ${SINK_NAME}-EchoFree
     fi
 
-    pactl set-default-source $SINK_NAME.monitor
 fi
 
 # Check for gst-launch
@@ -495,7 +501,7 @@ pipeline_video() {
 pipeline_audio() {
   echo souphttpsrc location="$AUDIO_URL" do-timestamp=true is-live=true user-id="$USERNAME" user-pw="$PASSWORD" \
     ! $GST_AUDIO_CAPS ! queue \
-    ! pulsesink device="$SINK_NAME" sync=$SYNC \
+    ! pulsesink device="${SINK_NAME}" sync=$SYNC \
 
 }
 
@@ -553,4 +559,15 @@ do
         break
     fi
 done
-printf "GSTLAUNCH_PID=$GSTLAUNCH_PID\nCAPTURE_STREAM=$CAPTURE_STREAM\nDEFAULT_SOURCE=${DEFAULT_SOURCE}\nECANCEL_ID=${ECANCEL_ID}\nSINK_ID=${SINK_ID}\nMODE=$MODE\nADB=$ADB\nADB_FLAGS=$ADB_FLAGS\nPORT=$PORT\n" > $SAVE_DEVICE_PATH
+printf """
+GSTLAUNCH_PID=$GSTLAUNCH_PID
+CAPTURE_STREAM=$CAPTURE_STREAM
+DEFAULT_SOURCE=${DEFAULT_SOURCE}
+ECANCEL_ID=${ECANCEL_ID}
+SINK_ID=${SINK_ID}
+SOURCE_ID=${SOURCE_ID}
+MODE=$MODE
+ADB=$ADB
+ADB_FLAGS=$ADB_FLAGS
+PORT=$PORT
+""" > $SAVE_DEVICE_PATH
