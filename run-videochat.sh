@@ -56,6 +56,7 @@ show_help() {
     echo " -C, --no-echo-cancel   do not set up echo cancellation"
     echo " -d, --device <device>  force video device to use"
     echo " -f, --flip <flip>      flip image"
+    echo " -F, --fps <fps>        video framerate (fractional) (default 30/1)"
     echo " -h, --height <height>  set image height (default 480)"
     echo " -l, --adb-flags <id>   adb flags to specify device id"
     echo " -i, --use-wifi <ip>    use wi-fi mode with specified ip"
@@ -177,6 +178,10 @@ ADB_FLAGS=
 # set on command line
 FLIP_METHOD=
 
+# video framerate
+# use a usual default, without fps the caps negotiation might fail
+FPS=30/1
+
 # Default dimensions of video, can be overridden on command line.
 # Make sure both dimensions are multiples of 16 (see issue #97).
 WIDTH=640
@@ -207,9 +212,10 @@ while true; do
     case "$1" in
         -a | --audio ) CAPTURE_STREAM="a"; shift;;
         -b | --adb-path ) ADB="$2"; shift 2;;
-	    -C | --no-echo-cancel ) DISABLE_ECHO_CANCEL=1; shift;;
+        -C | --no-echo-cancel ) DISABLE_ECHO_CANCEL=1; shift;;
         -d | --device ) DEVICE="$2"; shift 2;;
         -f | --flip ) FLIP_METHOD="$2"; shift 2;;
+        -F | --fps ) FPS="$2"; shift 2;;
         -h | --height ) HEIGHT="$2"; shift 2;;
         -l | --adb-flags ) ADB_FLAGS="-s $2"; shift 2;;
         -i | --use-wifi ) IP="$2"; shift 2;;
@@ -441,7 +447,7 @@ pipeline_video() {
 
     echo souphttpsrc location="$VIDEO_URL" do-timestamp=true is-live=true user-id="$USERNAME" user-pw="$PASSWORD" \
       ! queue \
-      ! multipartdemux \
+      ! multipartdemux ! "image/jpeg,framerate=$FPS" \
       ! decodebin \
       $GST_FLIP \
       ! $GST_VIDEO_CONVERTER \
