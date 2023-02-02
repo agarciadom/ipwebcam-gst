@@ -205,7 +205,7 @@ V4L2_OPTS="exclusive_caps=1"
 USERNAME=""
 PASSWORD=""
 
-OPTS=`getopt -o ab:Cd:f:h:l:i:p:P:stu:vw:x --long audio,adb-path:,no-echo-cancel,device:,flip:,height:,help,adb-flags:,use-wifi:,port:,password:,no-sync,with-tee,username:,video,width:,no-proxy -n "$0" -- "$@"`
+OPTS=`getopt -o ab:Cd:f:F:h:l:i:p:P:stu:vw:x --long audio,adb-path:,no-echo-cancel,device:,flip:,fps:,height:,help,adb-flags:,use-wifi:,port:,password:,no-sync,with-tee,username:,video,width:,no-proxy -n "$0" -- "$@"`
 eval set -- "$OPTS"
 
 while true; do
