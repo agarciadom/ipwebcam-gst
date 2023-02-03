@@ -241,7 +241,7 @@ if ! grep '^[[:digit:]]\+/[[:digit:]]\+$' <<<"$FPS" >/dev/null 2>&1; then
         error "Bad FPS format: $FPS. It should look like '30' or '30/1'."
     fi
 fi
-if ((FPS == 0)); then  # Note: the fractional value gets evaluated as an (integer artithmetic) expression.
+if ((FPS == 0)); then  # Note: the fractional value gets evaluated as an (integer arithmetic) expression.
     warning "FPS $FPS &lt; 1/1, which might prevent the underlying gstreamer pipeline from starting."
 fi
 
