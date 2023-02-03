@@ -21,10 +21,6 @@
 # - upper-left-diagonal: flip across upper-left/lower-right diagonal
 # - upper-right-diagonal: flip across upper-right/lower-left diagonal
 #
-# However, some of these flip methods do not seem to work. In
-# particular, those which change the picture size, such as clockwise
-# or counterclockwise. *-flip and rotate-180 do work, though.
-#
 # To be able to use audio from your phone as a virtual microphone, open pavucontrol,
 # then open Playback tab and choose 'IP Webcam' for gst-launch-1.0 playback Stream.
 # Then to use audio stream in Audacity, open it and press record button or click on
@@ -460,10 +456,10 @@ pipeline_video() {
       ! queue \
       ! multipartdemux ! "image/jpeg,framerate=$FPS" \
       ! decodebin \
-      $GST_FLIP \
       ! $GST_VIDEO_CONVERTER \
       ! videoscale \
       ! $GST_VIDEO_CAPS \
+      $GST_FLIP \
       $GST_TEE \
       ! v4l2sink device="$DEVICE" sync=$SYNC
 }
