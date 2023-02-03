@@ -317,19 +317,19 @@ fi
 # If the user hasn't manually specified which /dev/video* to use
 # through DEVICE, use the first "v4l2 loopback" device as the webcam:
 # this should help when loading v4l2loopback on a system that already
-# has a regular webcam. If that doesn't work, fall back to /dev/video0.
+# has a regular webcam. If that doesn't work, fall back to first /dev/video*.
 if [ -z "$DEVICE" ]; then
-    if can_run v4l2-ctl; then
-        for d in /dev/video*; do
-            if v4l2-ctl -d "$d" -D | grep -q "v4l2 loopback"; then
-                DEVICE=$d
-                break
-            fi
-        done
-    fi
-    if [ -z "$DEVICE" ]; then
-        DEVICE=/dev/video0
-        warning "Could not find the v4l2loopback device: falling back to $DEVICE"
+    if v4l2lb_video_device_names="$(ls /sys/devices/virtual/video4linux/ 2>/dev/null)"; then
+        # use the first v4l2loopback device
+        DEVICE="/dev/$(head -n 1 <<<"$v4l2lb_video_device_names")"
+        if (($(wc -l <<<"$v4l2lb_video_device_names") > 1)); then
+            echo "Using the first v4l2loopback device $DEVICE, but there are more. Make sure it's the right one." >&2
+        fi
+    elif video_device_names="$(ls /dev/video* 2>/dev/null)"; then
+        DEVICE="/dev/$(head -n 1 <<<"$video_device_names")"
+        warning "Could not find any v4l2loopback device: falling back to $DEVICE"
+    else
+        error "Could not find any video device."
     fi
 fi
 
