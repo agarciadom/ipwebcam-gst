@@ -56,6 +56,7 @@ show_help() {
     echo " -C, --no-echo-cancel   do not set up echo cancellation"
     echo " -d, --device <device>  force video device to use"
     echo " -f, --flip <flip>      flip image"
+    echo " -F, --fps <fps>        video framerate (fractional) (default 30/1)"
     echo " -h, --height <height>  set image height (default 480)"
     echo " -l, --adb-flags <id>   adb flags to specify device id"
     echo " -i, --use-wifi <ip>    use wi-fi mode with specified ip"
@@ -177,6 +178,10 @@ ADB_FLAGS=
 # set on command line
 FLIP_METHOD=
 
+# video framerate
+# use a usual default, without fps the caps negotiation might fail
+FPS=30/1
+
 # Default dimensions of video, can be overridden on command line.
 # Make sure both dimensions are multiples of 16 (see issue #97).
 WIDTH=640
@@ -200,16 +205,17 @@ V4L2_OPTS="exclusive_caps=1"
 USERNAME=""
 PASSWORD=""
 
-OPTS=`getopt -o ab:Cd:f:h:l:i:p:P:stu:vw:x --long audio,adb-path:,no-echo-cancel,device:,flip:,height:,help,adb-flags:,use-wifi:,port:,password:,no-sync,with-tee,username:,video,width:,no-proxy -n "$0" -- "$@"`
+OPTS=`getopt -o ab:Cd:f:F:h:l:i:p:P:stu:vw:x --long audio,adb-path:,no-echo-cancel,device:,flip:,fps:,height:,help,adb-flags:,use-wifi:,port:,password:,no-sync,with-tee,username:,video,width:,no-proxy -n "$0" -- "$@"`
 eval set -- "$OPTS"
 
 while true; do
     case "$1" in
         -a | --audio ) CAPTURE_STREAM="a"; shift;;
         -b | --adb-path ) ADB="$2"; shift 2;;
-	    -C | --no-echo-cancel ) DISABLE_ECHO_CANCEL=1; shift;;
+        -C | --no-echo-cancel ) DISABLE_ECHO_CANCEL=1; shift;;
         -d | --device ) DEVICE="$2"; shift 2;;
         -f | --flip ) FLIP_METHOD="$2"; shift 2;;
+        -F | --fps ) FPS="$2"; shift 2;;
         -h | --height ) HEIGHT="$2"; shift 2;;
         -l | --adb-flags ) ADB_FLAGS="-s $2"; shift 2;;
         -i | --use-wifi ) IP="$2"; shift 2;;
@@ -226,6 +232,18 @@ while true; do
         * ) echo "Internal error!" ; exit 1 ;;
     esac
 done
+
+# Ensure FPS is fractional (and above 1/1).
+if ! grep '^[[:digit:]]\+/[[:digit:]]\+$' <<<"$FPS" >/dev/null 2>&1; then
+    if grep '^[[:digit:]]\+$' <<<"$FPS" >/dev/null 2>&1; then
+        FPS="$FPS/1"
+    else
+        error "Bad FPS format: $FPS. It should look like '30' or '30/1'."
+    fi
+fi
+if ((FPS == 0)); then  # Note: the fractional value gets evaluated as an (integer arithmetic) expression.
+    warning "FPS $FPS &lt; 1/1, which might prevent the underlying gstreamer pipeline from starting."
+fi
 
 declare -A DISTS
 DISTS=(["Debian"]=1 ["Ubuntu"]=2 ["Arch"]=3 ["LinuxMint"]=4)
@@ -277,8 +295,7 @@ GST_AUDIO_CAPS="$GST_AUDIO_MIMETYPE,$GST_AUDIO_FORMAT$GST_AUDIO_LAYOUT,$GST_AUDI
 PA_AUDIO_CAPS="$GST_AUDIO_FORMAT $GST_AUDIO_RATE $GST_AUDIO_CHANNELS"
 
 # GStreamer debug string (see gst-launch manpage)
-GST_DEBUG=souphttpsrc:0,videoflip:0,$GST_CONVERTER:0,v4l2sink:0,pulse:0
-# Is $GST_CONVERTER defined anywhere? Maybe you mean videoconvert vs ffmpegcolorspace? It is in GST_VIDEO_CONVERTER
+GST_DEBUG=souphttpsrc:0,videoflip:0,$GST_VIDEO_CONVERTER:0,v4l2sink:0,pulse:0
 
 ### MAIN BODY
 
@@ -441,7 +458,7 @@ pipeline_video() {
 
     echo souphttpsrc location="$VIDEO_URL" do-timestamp=true is-live=true user-id="$USERNAME" user-pw="$PASSWORD" \
       ! queue \
-      ! multipartdemux \
+      ! multipartdemux ! "image/jpeg,framerate=$FPS" \
       ! decodebin \
       $GST_FLIP \
       ! $GST_VIDEO_CONVERTER \
