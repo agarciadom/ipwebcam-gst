@@ -233,6 +233,18 @@ while true; do
     esac
 done
 
+# Ensure FPS is fractional (and above 1/1).
+if ! grep '^[[:digit:]]\+/[[:digit:]]\+$' <<<"$FPS" >/dev/null 2>&1; then
+    if grep '^[[:digit:]]\+$' <<<"$FPS" >/dev/null 2>&1; then
+        FPS="$FPS/1"
+    else
+        error "Bad FPS format: $FPS. It should look like '30' or '30/1'"
+    fi
+fi
+if ((FPS == 0)); then  # Note: the fractional value gets evaluated as an (integer artithmetic) expression.
+    warning "FPS $FPS &lt; 1/1, which might prevent the underlying gstreamer pipeline from starting."
+fi
+
 declare -A DISTS
 DISTS=(["Debian"]=1 ["Ubuntu"]=2 ["Arch"]=3 ["LinuxMint"]=4)
 
@@ -283,8 +295,7 @@ GST_AUDIO_CAPS="$GST_AUDIO_MIMETYPE,$GST_AUDIO_FORMAT$GST_AUDIO_LAYOUT,$GST_AUDI
 PA_AUDIO_CAPS="$GST_AUDIO_FORMAT $GST_AUDIO_RATE $GST_AUDIO_CHANNELS"
 
 # GStreamer debug string (see gst-launch manpage)
-GST_DEBUG=souphttpsrc:0,videoflip:0,$GST_CONVERTER:0,v4l2sink:0,pulse:0
-# Is $GST_CONVERTER defined anywhere? Maybe you mean videoconvert vs ffmpegcolorspace? It is in GST_VIDEO_CONVERTER
+GST_DEBUG=souphttpsrc:0,videoflip:0,$GST_VIDEO_CONVERTER:0,v4l2sink:0,pulse:0
 
 ### MAIN BODY
 
