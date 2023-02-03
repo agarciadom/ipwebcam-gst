@@ -178,10 +178,10 @@ FLIP_METHOD=
 # use a usual default, without fps the caps negotiation might fail
 FPS=30/1
 
-# Default dimensions of video, can be overridden on command line.
+# Dimensions of video are infered from the source, can be overridden on command line.
 # Make sure both dimensions are multiples of 16 (see issue #97).
-WIDTH=640
-HEIGHT=480
+WIDTH=
+HEIGHT=
 
 # Force syncing to timestamps. Useful to keep audio and video in sync,
 # but may impact performance in slow connections. If you see errors about
@@ -283,10 +283,9 @@ then
     GST_AUDIO_FORMAT="format=S16LE"
     GST_AUDIO_LAYOUT=",layout=interleaved"
 fi
+DIMENSIONS="${WIDTH:+,width=$WIDTH}${HEIGHT:+,height=$HEIGHT}"
 
-DIMENSIONS="width=$WIDTH,height=$HEIGHT"
-
-GST_VIDEO_CAPS="$GST_VIDEO_MIMETYPE,$GST_VIDEO_FORMAT,$DIMENSIONS"
+GST_VIDEO_CAPS="$GST_VIDEO_MIMETYPE,$GST_VIDEO_FORMAT$DIMENSIONS"
 GST_AUDIO_CAPS="$GST_AUDIO_MIMETYPE,$GST_AUDIO_FORMAT$GST_AUDIO_LAYOUT,$GST_AUDIO_RATE,$GST_AUDIO_CHANNELS"
 PA_AUDIO_CAPS="$GST_AUDIO_FORMAT $GST_AUDIO_RATE $GST_AUDIO_CHANNELS"
 
