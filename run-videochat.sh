@@ -238,7 +238,7 @@ if ! grep '^[[:digit:]]\+/[[:digit:]]\+$' <<<"$FPS" >/dev/null 2>&1; then
     if grep '^[[:digit:]]\+$' <<<"$FPS" >/dev/null 2>&1; then
         FPS="$FPS/1"
     else
-        error "Bad FPS format: $FPS. It should look like '30' or '30/1'"
+        error "Bad FPS format: $FPS. It should look like '30' or '30/1'."
     fi
 fi
 if ((FPS == 0)); then  # Note: the fractional value gets evaluated as an (integer artithmetic) expression.
