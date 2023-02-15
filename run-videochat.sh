@@ -47,24 +47,28 @@ show_help() {
     echo "Script for using IP Webcam as a microphone/webcam."
     echo
     echo "Options:"
-    echo " -a, --audio            capture only audio"
-    echo " -b, --adb-path <path>  set adb location if not in PATH"
-    echo " -C, --no-echo-cancel   do not set up echo cancellation"
-    echo " -d, --device <device>  force video device to use"
-    echo " -f, --flip <flip>      flip image"
-    echo " -F, --fps <fps>        video framerate (fractional) (default 30/1)"
-    echo " -h, --height <height>  set image height (default 480)"
-    echo " -l, --adb-flags <id>   adb flags to specify device id"
-    echo " -i, --use-wifi <ip>    use wi-fi mode with specified ip"
-    echo " -p, --port <port>      port on which IP Webcam is listening (default 8080)"
-    echo " -P, --password <pass>  password for accesing the IP Webcam"
-    echo " -s, --no-sync          No force syncing to timestamps"
-    echo " -t, --with-tee         adds the 'tee' multiplexer to the pipeline, to workaround 'single-frame' capture issue (see issue #97)"
-    echo " -u, --username <user>  username for accesing the IP Webcam"
-    echo " -v, --video            capture only video"
-    echo " -w, --width <width>    set image width (default 640)"
-    echo " -x, --no-proxy         disable proxy while acessing IP"
-    echo "     --help             show this help"
+    echo " -a, --audio             capture only audio"
+    echo " -b, --adb-path <path>   set adb location if not in PATH"
+    echo " -C, --no-echo-cancel    do not set up echo cancellation"
+    echo " -d, --device <device>   force video device to use"
+    echo " -f, --flip <flip>       flip image"
+    echo " -F, --fps <fps>         video framerate (fractional) (default 30/1)"
+    echo " -h, --height <height>   set image height (default 480)"
+    echo " -l, --adb-flags <id>    adb flags to specify device id"
+    echo " -i, --use-wifi <ip>     use wi-fi mode with specified ip"
+    echo " -p, --port <port>       port on which IP Webcam is listening (default 8080)"
+    echo " -P, --password <pass>   password for accesing the IP Webcam"
+    echo " -s, --no-sync           No force syncing to timestamps"
+    echo " -t, --with-tee          adds the 'tee' multiplexer to the pipeline, to workaround 'single-frame' capture issue (see issue #97)"
+    echo " -u, --username <user>   username for accesing the IP Webcam"
+    echo " -v, --video             capture only video"
+    echo " -w, --width <width>     set image width (default 640)"
+    echo " -x, --no-proxy          disable proxy while acessing IP"
+    echo "     --crop-left <px>    crop the image by <px> pixels from left"
+    echo "     --crop-right <px>   crop the image by <px> pixels from right"
+    echo "     --crop-top <px>     crop the image by <px> pixels from top"
+    echo "     --crop-bottom <px>  crop the image by <px> pixels from bottom"
+    echo "     --help              show this help"
 }
 check_os_version() {
     # checks if the OS version can use newer GStreamer version
@@ -143,6 +147,34 @@ module_id_by_sinkname() {
     pactl list sinks | grep -e "Name:" -e "Module:" |grep -A1 "Name: $1$" | grep Module: | cut -f2 -d: | tr -d ' '
 }
 
+ensure_div() {
+    local -i val="$1"
+    local -i div="$2"
+    local -i mod
+    mod=$(( val % div ))
+    if (( mod == 0 )); then
+        printf '%d' "$val"
+    else
+        if (( mod >= div/2 )); then
+            printf '%d' "$(( val + div - mod ))"
+        else
+            printf '%d' "$(( val - mod ))"
+        fi
+        return 1
+    fi
+}
+
+validate_div_16() {
+    local param="$1"
+    local val="$2"
+    local val2
+    if ! val2="$(ensure_div "$val" 16)"; then
+        echo "warning: The parameter $param=$val might need to be divisible by 16. Consider using the closest value: $val2." >&2
+    fi
+    # use $val2 to enforce
+    printf '%d' "$val"
+}
+
 ### CONFIGURATION
 
 # Exit on first error
@@ -183,6 +215,12 @@ FPS=30/1
 WIDTH=
 HEIGHT=
 
+# Video crop values
+CROP_LEFT=
+CROP_RIGHT=
+CROP_TOP=
+CROP_BOTTOM=
+
 # Force syncing to timestamps. Useful to keep audio and video in sync,
 # but may impact performance in slow connections. If you see errors about
 # timestamping or you do not need audio, you can try changing this to false from command line.
@@ -201,7 +239,7 @@ V4L2_OPTS="exclusive_caps=1"
 USERNAME=""
 PASSWORD=""
 
-OPTS=`getopt -o ab:Cd:f:F:h:l:i:p:P:stu:vw:x --long audio,adb-path:,no-echo-cancel,device:,flip:,fps:,height:,help,adb-flags:,use-wifi:,port:,password:,no-sync,with-tee,username:,video,width:,no-proxy -n "$0" -- "$@"`
+OPTS="$(getopt -o ab:Cd:f:F:h:l:i:p:P:stu:vw:x --long audio,adb-path:,no-echo-cancel,device:,flip:,fps:,height:,help,adb-flags:,use-wifi:,port:,password:,no-sync,with-tee,username:,video,width:,no-proxy,crop-left:,crop-right:,crop-top:,crop-bottom: -n "$0" -- "$@")"
 eval set -- "$OPTS"
 
 while true; do
@@ -212,7 +250,7 @@ while true; do
         -d | --device ) DEVICE="$2"; shift 2;;
         -f | --flip ) FLIP_METHOD="$2"; shift 2;;
         -F | --fps ) FPS="$2"; shift 2;;
-        -h | --height ) HEIGHT="$2"; shift 2;;
+        -h | --height ) HEIGHT="$(validate_div_16 "$1" "$2")"; shift 2;;
         -l | --adb-flags ) ADB_FLAGS="-s $2"; shift 2;;
         -i | --use-wifi ) IP="$2"; shift 2;;
         -p | --port ) PORT="$2"; shift 2;;
@@ -221,8 +259,12 @@ while true; do
         -s | --no-sync ) SYNC=false; shift;;
         -t | --with-tee ) USE_TEE=true; shift;;
         -v | --video ) CAPTURE_STREAM="v"; shift;;
-        -w | --width ) WIDTH="$2"; shift 2;;
+        -w | --width ) WIDTH="$(validate_div_16 "$1" "$2")"; shift 2;;
         -x | --no-proxy) DISABLE_PROXY=1; shift;;
+             --crop-left) CROP_LEFT="$(validate_div_16 "$1" "$2")"; shift 2;;
+             --crop-right) CROP_RIGHT="$(validate_div_16 "$1" "$2")"; shift 2;;
+             --crop-top) CROP_TOP="$(validate_div_16 "$1" "$2")"; shift 2;;
+             --crop-bottom) CROP_BOTTOM="$(validate_div_16 "$1" "$2")"; shift 2;;
         --help) show_help; exit; shift;;
         -- ) shift; break;;
         * ) echo "Internal error!" ; exit 1 ;;
@@ -438,15 +480,14 @@ set +e
 #sudo v4l2loopback-ctl set-caps $GST_0_10_VIDEO_CAPS $DEVICE
 
 pipeline_video() {
-    GST_FLIP=""
-    GST_TEE=""
-    if [ $FLIP_METHOD ]; then
-        GST_FLIP="! videoflip method=\"$FLIP_METHOD\" "
-    fi
+    GST_FLIP="${FLIP_METHOD:+! videoflip method=$FLIP_METHOD}"
+    GST_CROP="${CROP_LEFT:+ left=$CROP_LEFT}${CROP_RIGHT:+ right=$CROP_RIGHT}${CROP_TOP:+ top=$CROP_TOP}${CROP_BOTTOM:+ bottom=$CROP_BOTTOM}"
+    GST_CROP="${GST_CROP:+! videocrop$GST_CROP}"
     # Due to what seems an issue between v4l2loopback and gst-1.0 (https://github.com/umlaeute/v4l2loopback/issues/83),
     # the pipeline might need the "tee" multiplexer to enforce an additional buffer copy.
     # Here we enable it if the user explicitly asked to.
     # TODO: consider automatically enabling this if using gst-1.0 and specific version ranges of v4l2loopback.
+    GST_TEE=""
     if [ "$USE_TEE" = "true" ]; then
         GST_TEE="! tee "
     fi
@@ -459,6 +500,7 @@ pipeline_video() {
       ! videoscale \
       ! $GST_VIDEO_CAPS \
       $GST_FLIP \
+      $GST_CROP \
       $GST_TEE \
       ! v4l2sink device="$DEVICE" sync=$SYNC
 }
