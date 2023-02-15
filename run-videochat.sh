@@ -175,6 +175,99 @@ validate_div_16() {
     printf '%d' "$val"
 }
 
+# kills a <pid> with <name> with <sig> (TERM), waits <timeout> seconds before KILLing it
+killtask() {
+    local pid="$1"
+    local sig="${2:-TERM}"
+    local timeout="${3:-10}"
+    local name="${4:-"pid $pid"}"
+    if [ "$pid" ]; then
+        printf "Terminating %s.\n" "$name" >&2
+        kill -s "$sig" -- "$pid"
+
+        local i
+        for ((i=0; i < timeout; i++)); do
+            sleep 1
+            if ! ps -p "$pid" >/dev/null 2>&1; then
+                return 0
+            fi
+        done
+
+        printf "%s is not responding to %s, KILLing it.\n" "${name^}" "$sig" >&2
+        kill -s KILL -- "$pid"
+        return 1
+    fi
+}
+
+# a kind of a macro to be run within monitor_job
+# sets variable killing=1 and runs the killtask
+kill_job() {
+    killing=1
+    trap - INT TERM
+    killtask "$pid" "$killsig" 10 "$name" &
+}
+
+set_kill_job_trap() {
+    trap 'kill_job' INT TERM
+}
+
+# runs a background job (specified with "$@") and monitors it for termination
+# also watches stdin for enter, SIGINT (^C) and SIGTERM, on which it gracefully terminates the job
+# accepts couple JOB_ variables, that slightly alter the behavior:
+#   JOB_SIGNAL      - (TERM) initial signal to terminate the monitored job
+#   JOB_LOG         - file to redirect job's stdin & stderr
+#   JOB_NAME        - ("the job") name of the job for log messages
+#   JOB_INTRO_CMD   - command or function name (w/o args) to be called after job start
+#   JOB_FAILURE_CMD - command or function name (w/o args) to be called on job unexpected end
+monitor_job() {
+    local killsig="${JOB_SIGNAL:-TERM}"
+    local log="${JOB_LOG:-}"
+    local name="${JOB_NAME:-the job}"
+    local intro="${JOB_INTRO_CMD:-}"
+    local failure="${JOB_FAILURE_CMD:-}"
+    local run_intro=1
+    local pid=
+    local killing=
+
+    # schedule a signal trap that kills the job
+    set_kill_job_trap
+    # start the job (redirect output to a log file)
+    if [ "$log" ]; then
+        "$@" >"$log" 2>&1 &
+    else
+        "$@" &
+    fi
+    pid=$!
+
+    # reading input to trigger termination, while also checking the process
+    local rc
+    while { rc=0; read -r -t 1 || rc=$?; } || ((rc > 128)); do
+        # enter has been pressed
+        if ((rc == 0)) && ! ((killing)); then
+            kill_job
+            break
+        fi
+        # break if the job is not running or we are killing it
+        if ! ps -p "$pid" >/dev/null 2>&1 || ((killing)); then
+            break
+        fi
+        # job is running (call intro 1st time)
+        if ((run_intro)); then
+            run_intro=0
+           ($intro)
+        fi
+    done
+    wait "$pid" >/dev/null 2>&1 || :
+    # did job terminate without us?
+    if ! ((killing)); then
+        if [ "$failure" ]; then
+            ($failure)
+        else
+            printf "warning: %s ended unexpectedly!\n" "${name^}" >&2
+        fi
+    fi
+}
+
 ### CONFIGURATION
 
 # Exit on first error
@@ -193,7 +286,7 @@ CAPTURE_STREAM=av
 AUDIO_CODEC=wav
 
 # Port on which IP Webcam is listening
-# Defaults to 8080, ovverrided by command line options.
+# Defaults to 8080, overrided by command line options.
 PORT=8080
 
 # If your "adb" is not in your $PATH, specify it on command line.
@@ -528,30 +621,30 @@ if [ $DISABLE_PROXY = 1 ]; then
     unset http_proxy
 fi
 
-"$GSTLAUNCH" -e -vt --gst-plugin-spew \
-             --gst-debug="$GST_DEBUG" \
-    $PIPELINE \
-    >feed.log 2>&1 &
+stream_intro() {
+    if [ $CAPTURE_STREAM = av ]; then
+        MESSAGE="IP Webcam audio is streaming through pulseaudio sink '$SINK_NAME'.\nIP Webcam video is streaming through v4l2loopback device $DEVICE.\n"
+    elif [ $CAPTURE_STREAM = a ]; then
+        MESSAGE="IP Webcam audio is streaming through pulseaudio sink '$SINK_NAME'.\n"
+    elif [ $CAPTURE_STREAM = v ]; then
+        MESSAGE="IP Webcam video is streaming through v4l2loopback device $DEVICE.\n"
+    else
+        error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
+    fi
+    info "${MESSAGE}You can now open your videochat app."
+
+    echo "Press enter to end stream."
+}
+stream_failure() {
+    warning "Stream ended unexpectedly!"
+}
+
+JOB_NAME='stream' JOB_LOG=feed.log JOB_INTRO_CMD=stream_intro JOB_FAILURE_CMD=stream_failure \
+    monitor_job "$GSTLAUNCH" -e -vt --gst-plugin-spew --gst-debug="$GST_DEBUG" $PIPELINE
     # Maybe we need edit this pipeline to transfer it to "Monitor of IP Webcam" to be able to use it as a microphone?
 
-GSTLAUNCH_PID=$!
-
-if [ $CAPTURE_STREAM = av ]; then
-    MESSAGE="IP Webcam audio is streaming through pulseaudio sink '$SINK_NAME'.\nIP Webcam video is streaming through v4l2loopback device $DEVICE.\n"
-elif [ $CAPTURE_STREAM = a ]; then
-    MESSAGE="IP Webcam audio is streaming through pulseaudio sink '$SINK_NAME'.\n"
-elif [ $CAPTURE_STREAM = v ]; then
-    MESSAGE="IP Webcam video is streaming through v4l2loopback device $DEVICE.\n"
-else
-    error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
-fi
-info "${MESSAGE}You can now open your videochat app."
-
-echo "Press enter to end stream"
-read
-
-kill $GSTLAUNCH_PID > /dev/null 2>&1 || echo ""
-if [ $CAPTURE_STREAM = a -o $CAPTURE_STREAM = av ]; then
+# cleanup
+if [ $CAPTURE_STREAM = a ] || [ $CAPTURE_STREAM = av ]; then
     pactl set-default-source ${DEFAULT_SOURCE}
     pactl unload-module ${ECANCEL_ID}
     pactl unload-module ${SINK_ID}
@@ -561,4 +654,3 @@ fi
 if [ $MODE = adb ]; then "$ADB" $ADB_FLAGS forward --remove tcp:$PORT; fi
 
 echo "Disconnected from IP Webcam. Have a nice day!"
-# idea: capture ctrl-c signal and set default source back
