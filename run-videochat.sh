@@ -485,7 +485,7 @@ if [ -z $IP ]; then
         PIDOF_ADB="$(pidof adb)"
         if test -n "$PIDOF_ADB" && ss -lptn src ":$PORT" | grep -q "pid=${PIDOF_ADB}"; then
             if confirm "Your port $PORT seems to be in use by ADB: would you like to clear the previous port before continuing?"; then
-                adb forward --remove tcp:$PORT
+                "$ADB" $ADB_FLAGS forward --remove tcp:$PORT
             else
                 exit 1
             fi
