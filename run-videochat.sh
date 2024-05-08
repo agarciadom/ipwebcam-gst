@@ -3,7 +3,7 @@
 # Script for using IP Webcam as a microphone/webcam in Debian Jessie,
 # Ubuntu 13.04, 14.04, 16.04 and Arch Linux
 
-# Copyright (C) 2011-2020 Antonio García Domínguez
+# Copyright (C) 2011-2021 Antonio García Domínguez
 # Copyright (C) 2016 C.J. Adams-Collier
 # Copyright (C) 2016 Laptander
 # Licensed under GPLv3
@@ -20,10 +20,6 @@
 # - vertical-flip: flip vertically
 # - upper-left-diagonal: flip across upper-left/lower-right diagonal
 # - upper-right-diagonal: flip across upper-right/lower-left diagonal
-#
-# However, some of these flip methods do not seem to work. In
-# particular, those which change the picture size, such as clockwise
-# or counterclockwise. *-flip and rotate-180 do work, though.
 #
 # To be able to use audio from your phone as a virtual microphone, open pavucontrol,
 # then open Playback tab and choose 'IP Webcam' for gst-launch-1.0 playback Stream.
@@ -51,22 +47,29 @@ show_help() {
     echo "Script for using IP Webcam as a microphone/webcam."
     echo
     echo "Options:"
-    echo " -a, --audio            capture only audio"
-    echo " -b, --adb-path <path>  set adb location if not in PATH"
-    echo " -C, --no-echo-cancel   do not set up echo cancellation"
-    echo " -d, --device <device>  force video device to use"
-    echo " -f, --flip <flip>      flip image"
-    echo " -h, --height <height>  set image height (default 480)"
-    echo " -l, --adb-flags <id>   adb flags to specify device id"
-    echo " -i, --use-wifi <ip>    use wi-fi mode with specified ip"
-    echo " -p, --port <port>      port on which IP Webcam is listening (default 8080)"
-    echo " -s, --no-sync          No force syncing to timestamps"
-    echo " -v, --video            capture only video"
-    echo " -w, --width <width>    set image width (default 640)"
-    echo " -x, --no-proxy         disable proxy while acessing IP"
-    echo "     --help             show this help"
+    echo " -a, --audio             capture only audio"
+    echo " -b, --adb-path <path>   set adb location if not in PATH"
+    echo " -C, --no-echo-cancel    do not set up echo cancellation"
+    echo " -d, --device <device>   force video device to use"
+    echo " -f, --flip <flip>       flip image"
+    echo " -F, --fps <fps>         video framerate (fractional) (default 30/1)"
+    echo " -h, --height <height>   set image height (default 480)"
+    echo " -l, --adb-flags <id>    adb flags to specify device id"
+    echo " -i, --use-wifi <ip>     use wi-fi mode with specified ip"
+    echo " -p, --port <port>       port on which IP Webcam is listening (default 8080)"
+    echo " -P, --password <pass>   password for accesing the IP Webcam"
+    echo " -s, --no-sync           No force syncing to timestamps"
+    echo " -t, --with-tee          adds the 'tee' multiplexer to the pipeline, to workaround 'single-frame' capture issue (see issue #97)"
+    echo " -u, --username <user>   username for accesing the IP Webcam"
+    echo " -v, --video             capture only video"
+    echo " -w, --width <width>     set image width (default 640)"
+    echo " -x, --no-proxy          disable proxy while acessing IP"
+    echo "     --crop-left <px>    crop the image by <px> pixels from left"
+    echo "     --crop-right <px>   crop the image by <px> pixels from right"
+    echo "     --crop-top <px>     crop the image by <px> pixels from top"
+    echo "     --crop-bottom <px>  crop the image by <px> pixels from bottom"
+    echo "     --help              show this help"
 }
-
 check_os_version() {
     # checks if the OS version can use newer GStreamer version
     DIST="$1"
@@ -115,9 +118,12 @@ phone_plugged() {
 url_reachable() {
     CURL_OPTIONS=""
     if [ $DISABLE_PROXY = 1 ]; then
-        CURL_OPTIONS="--noproxy $IP"
+        CURL_OPTIONS+="--noproxy $IP"
     fi
 
+    if [[ $USERNAME != "" && $PASSWORD != "" ]]; then
+        CURL_OPTIONS+="-u $USERNAME:$PASSWORD"
+    fi
     # -f produces a non-zero status code when answer is 4xx or 5xx
     curl $CURL_OPTIONS -f -m 5 -sI "$1" >/dev/null
 }
@@ -138,7 +144,128 @@ iw_server_is_started() {
 }
 
 module_id_by_sinkname() {
-    pacmd list-sinks | grep -e 'name:' -e 'module:' | grep -A1 "name: <$1>" | grep module: | cut -f2 -d: | tr -d ' '
+    pactl list sinks | grep -e "Name:" -e "Module:" |grep -A1 "Name: $1$" | grep Module: | cut -f2 -d: | tr -d ' '
+}
+
+ensure_div() {
+    local -i val="$1"
+    local -i div="$2"
+    local -i mod
+    mod=$(( val % div ))
+    if (( mod == 0 )); then
+        printf '%d' "$val"
+    else
+        if (( mod >= div/2 )); then
+            printf '%d' "$(( val + div - mod ))"
+        else
+            printf '%d' "$(( val - mod ))"
+        fi
+        return 1
+    fi
+}
+
+validate_div_16() {
+    local param="$1"
+    local val="$2"
+    local val2
+    if ! val2="$(ensure_div "$val" 16)"; then
+        echo "warning: The parameter $param=$val might need to be divisible by 16. Consider using the closest value: $val2." >&2
+    fi
+    # use $val2 to enforce
+    printf '%d' "$val"
+}
+
+# kills a <pid> with <name> with <sig> (TERM), waits <timeout> seconds before KILLing it
+killtask() {
+    local pid="$1"
+    local sig="${2:-TERM}"
+    local timeout="${3:-10}"
+    local name="${4:-"pid $pid"}"
+    if [ "$pid" ]; then
+        printf "Terminating %s.\n" "$name" >&2
+        kill -s "$sig" -- "$pid"
+
+        local i
+        for ((i=0; i < timeout; i++)); do
+            sleep 1
+            if ! ps -p "$pid" >/dev/null 2>&1; then
+                return 0
+            fi
+        done
+
+        printf "%s is not responding to %s, KILLing it.\n" "${name^}" "$sig" >&2
+        kill -s KILL -- "$pid"
+        return 1
+    fi
+}
+
+# a kind of a macro to be run within monitor_job
+# sets variable killing=1 and runs the killtask
+kill_job() {
+    killing=1
+    trap - INT TERM
+    killtask "$pid" "$killsig" 10 "$name" &
+}
+
+set_kill_job_trap() {
+    trap 'kill_job' INT TERM
+}
+
+# runs a background job (specified with "$@") and monitors it for termination
+# also watches stdin for enter, SIGINT (^C) and SIGTERM, on which it gracefully terminates the job
+# accepts couple JOB_ variables, that slightly alter the behavior:
+#   JOB_SIGNAL      - (TERM) initial signal to terminate the monitored job
+#   JOB_LOG         - file to redirect job's stdin & stderr
+#   JOB_NAME        - ("the job") name of the job for log messages
+#   JOB_INTRO_CMD   - command or function name (w/o args) to be called after job start
+#   JOB_FAILURE_CMD - command or function name (w/o args) to be called on job unexpected end
+monitor_job() {
+    local killsig="${JOB_SIGNAL:-TERM}"
+    local log="${JOB_LOG:-}"
+    local name="${JOB_NAME:-the job}"
+    local intro="${JOB_INTRO_CMD:-}"
+    local failure="${JOB_FAILURE_CMD:-}"
+    local run_intro=1
+    local pid=
+    local killing=
+
+    # schedule a signal trap that kills the job
+    set_kill_job_trap
+    # start the job (redirect output to a log file)
+    if [ "$log" ]; then
+        "$@" >"$log" 2>&1 &
+    else
+        "$@" &
+    fi
+    pid=$!
+
+    # reading input to trigger termination, while also checking the process
+    local rc
+    while { rc=0; read -r -t 1 || rc=$?; } || ((rc > 128)); do
+        # enter has been pressed
+        if ((rc == 0)) && ! ((killing)); then
+            kill_job
+            break
+        fi
+        # break if the job is not running or we are killing it
+        if ! ps -p "$pid" >/dev/null 2>&1 || ((killing)); then
+            break
+        fi
+        # job is running (call intro 1st time)
+        if ((run_intro)); then
+            run_intro=0
+           ($intro)
+        fi
+    done
+    wait "$pid" >/dev/null 2>&1 || :
+    # did job terminate without us?
+    if ! ((killing)); then
+        if [ "$failure" ]; then
+            ($failure)
+        else
+            printf "warning: %s ended unexpectedly!\n" "${name^}" >&2
+        fi
+    fi
 }
 
 ### CONFIGURATION
@@ -159,7 +286,7 @@ CAPTURE_STREAM=av
 AUDIO_CODEC=wav
 
 # Port on which IP Webcam is listening
-# Defaults to 8080, ovverrided by command line options.
+# Defaults to 8080, overrided by command line options.
 PORT=8080
 
 # If your "adb" is not in your $PATH, specify it on command line.
@@ -172,9 +299,20 @@ ADB_FLAGS=
 # set on command line
 FLIP_METHOD=
 
-# Default dimensions of video, can be ovverrided on command line.
-WIDTH=640
-HEIGHT=480
+# video framerate
+# use a usual default, without fps the caps negotiation might fail
+FPS=30/1
+
+# Dimensions of video are infered from the source, can be overridden on command line.
+# Make sure both dimensions are multiples of 16 (see issue #97).
+WIDTH=
+HEIGHT=
+
+# Video crop values
+CROP_LEFT=
+CROP_RIGHT=
+CROP_TOP=
+CROP_BOTTOM=
 
 # Force syncing to timestamps. Useful to keep audio and video in sync,
 # but may impact performance in slow connections. If you see errors about
@@ -188,29 +326,55 @@ DISABLE_PROXY=0
 # To disable echo cancellation
 DISABLE_ECHO_CANCEL=0
 
-OPTS=`getopt -o ab:Cd:f:h:l:i:p:svw:x --long audio,adb-path:,device:,flip:,height:,help,adb-flags:,use-wifi:,port:,no-sync,video,width:,no-proxy,no-echo-cancel -n "$0" -- "$@"`
+# Use exclusive caps by default (required by Chrome, Cheese and others)
+V4L2_OPTS="exclusive_caps=1"
+
+USERNAME=""
+PASSWORD=""
+
+OPTS="$(getopt -o ab:Cd:f:F:h:l:i:p:P:stu:vw:x --long audio,adb-path:,no-echo-cancel,device:,flip:,fps:,height:,help,adb-flags:,use-wifi:,port:,password:,no-sync,with-tee,username:,video,width:,no-proxy,crop-left:,crop-right:,crop-top:,crop-bottom: -n "$0" -- "$@")"
 eval set -- "$OPTS"
 
 while true; do
     case "$1" in
         -a | --audio ) CAPTURE_STREAM="a"; shift;;
         -b | --adb-path ) ADB="$2"; shift 2;;
-	-C | --no-echo-cancel ) DISABLE_ECHO_CANCEL=1; shift;;
+        -C | --no-echo-cancel ) DISABLE_ECHO_CANCEL=1; shift;;
         -d | --device ) DEVICE="$2"; shift 2;;
         -f | --flip ) FLIP_METHOD="$2"; shift 2;;
-        -h | --height ) HEIGHT="$2"; shift 2;;
+        -F | --fps ) FPS="$2"; shift 2;;
+        -h | --height ) HEIGHT="$(validate_div_16 "$1" "$2")"; shift 2;;
         -l | --adb-flags ) ADB_FLAGS="-s $2"; shift 2;;
         -i | --use-wifi ) IP="$2"; shift 2;;
         -p | --port ) PORT="$2"; shift 2;;
+        -P | --password) PASSWORD="$2"; shift 2;;
+        -u | --username) USERNAME="$2"; shift 2;;
         -s | --no-sync ) SYNC=false; shift;;
+        -t | --with-tee ) USE_TEE=true; shift;;
         -v | --video ) CAPTURE_STREAM="v"; shift;;
-        -w | --width ) WIDTH="$2"; shift 2;;
+        -w | --width ) WIDTH="$(validate_div_16 "$1" "$2")"; shift 2;;
         -x | --no-proxy) DISABLE_PROXY=1; shift;;
+             --crop-left) CROP_LEFT="$(validate_div_16 "$1" "$2")"; shift 2;;
+             --crop-right) CROP_RIGHT="$(validate_div_16 "$1" "$2")"; shift 2;;
+             --crop-top) CROP_TOP="$(validate_div_16 "$1" "$2")"; shift 2;;
+             --crop-bottom) CROP_BOTTOM="$(validate_div_16 "$1" "$2")"; shift 2;;
         --help) show_help; exit; shift;;
         -- ) shift; break;;
         * ) echo "Internal error!" ; exit 1 ;;
     esac
 done
+
+# Ensure FPS is fractional (and above 1/1).
+if ! grep '^[[:digit:]]\+/[[:digit:]]\+$' <<<"$FPS" >/dev/null 2>&1; then
+    if grep '^[[:digit:]]\+$' <<<"$FPS" >/dev/null 2>&1; then
+        FPS="$FPS/1"
+    else
+        error "Bad FPS format: $FPS. It should look like '30' or '30/1'."
+    fi
+fi
+if ((FPS == 0)); then  # Note: the fractional value gets evaluated as an (integer arithmetic) expression.
+    warning "FPS $FPS &lt; 1/1, which might prevent the underlying gstreamer pipeline from starting."
+fi
 
 declare -A DISTS
 DISTS=(["Debian"]=1 ["Ubuntu"]=2 ["Arch"]=3 ["LinuxMint"]=4)
@@ -254,16 +418,14 @@ then
     GST_AUDIO_FORMAT="format=S16LE"
     GST_AUDIO_LAYOUT=",layout=interleaved"
 fi
+DIMENSIONS="${WIDTH:+,width=$WIDTH}${HEIGHT:+,height=$HEIGHT}"
 
-DIMENSIONS="width=$WIDTH,height=$HEIGHT"
-
-GST_VIDEO_CAPS="$GST_VIDEO_MIMETYPE,$GST_VIDEO_FORMAT,$DIMENSIONS"
+GST_VIDEO_CAPS="$GST_VIDEO_MIMETYPE,$GST_VIDEO_FORMAT$DIMENSIONS"
 GST_AUDIO_CAPS="$GST_AUDIO_MIMETYPE,$GST_AUDIO_FORMAT$GST_AUDIO_LAYOUT,$GST_AUDIO_RATE,$GST_AUDIO_CHANNELS"
 PA_AUDIO_CAPS="$GST_AUDIO_FORMAT $GST_AUDIO_RATE $GST_AUDIO_CHANNELS"
 
 # GStreamer debug string (see gst-launch manpage)
-GST_DEBUG=souphttpsrc:0,videoflip:0,$GST_CONVERTER:0,v4l2sink:0,pulse:0
-# Is $GST_CONVERTER defined anywhere? Maybe you mean videoconvert vs ffmpegcolorspace? It is in GST_VIDEO_CONVERTER
+GST_DEBUG=souphttpsrc:0,videoflip:0,$GST_VIDEO_CONVERTER:0,v4l2sink:0,pulse:0
 
 ### MAIN BODY
 
@@ -285,19 +447,19 @@ fi
 # If the user hasn't manually specified which /dev/video* to use
 # through DEVICE, use the first "v4l2 loopback" device as the webcam:
 # this should help when loading v4l2loopback on a system that already
-# has a regular webcam. If that doesn't work, fall back to /dev/video0.
+# has a regular webcam. If that doesn't work, fall back to first /dev/video*.
 if [ -z "$DEVICE" ]; then
-    if can_run v4l2-ctl; then
-        for d in /dev/video*; do
-            if v4l2-ctl -d "$d" -D | grep -q "v4l2 loopback"; then
-                DEVICE=$d
-                break
-            fi
-        done
-    fi
-    if [ -z "$DEVICE" ]; then
-        DEVICE=/dev/video0
-        warning "Could not find the v4l2loopback device: falling back to $DEVICE"
+    if v4l2lb_video_device_names="$(ls /sys/devices/virtual/video4linux/ 2>/dev/null)"; then
+        # use the first v4l2loopback device
+        DEVICE="/dev/$(head -n 1 <<<"$v4l2lb_video_device_names")"
+        if (($(wc -l <<<"$v4l2lb_video_device_names") > 1)); then
+            echo "Using the first v4l2loopback device $DEVICE, but there are more. Make sure it's the right one." >&2
+        fi
+    elif video_device_names="$(ls /dev/video* 2>/dev/null)"; then
+        DEVICE="/dev/$(head -n 1 <<<"$video_device_names")"
+        warning "Could not find any v4l2loopback device: falling back to $DEVICE"
+    else
+        error "Could not find any video device."
     fi
 fi
 
@@ -319,8 +481,17 @@ if [ -z $IP ]; then
     if ! phone_plugged; then
         error "adb is available, but the phone is not plugged in.\nConnect your phone to USB and allow usb debugging under developer settings or use Wi-Fi (slower)."
     fi
-    if ss -ln src :$PORT | grep -q :$PORT; then
-        error "Your port $PORT seems to be in use: try using Wi-Fi.\nIf you would like to use USB forwarding, please free it up and try again."
+    if ss -ln src ":$PORT" | grep -q ":$PORT"; then
+        PIDOF_ADB="$(pidof adb)"
+        if test -n "$PIDOF_ADB" && ss -lptn src ":$PORT" | grep -q "pid=${PIDOF_ADB}"; then
+            if confirm "Your port $PORT seems to be in use by ADB: would you like to clear the previous port before continuing?"; then
+                "$ADB" $ADB_FLAGS forward --remove tcp:$PORT
+            else
+                exit 1
+            fi
+        else
+            error "Your port $PORT seems to be in use: try using Wi-Fi.\nIf you would like to use USB forwarding, please free it up and try again."
+        fi
     fi
     "$ADB" $ADB_FLAGS forward tcp:$PORT tcp:$PORT
     IP=127.0.0.1
@@ -346,13 +517,23 @@ if ! iw_server_is_started; then
     error "$MESSAGE\nPlease install and open IP Webcam in your phone and start the server.\nMake sure that values of variables IP, PORT, CAPTURE_STREAM in this script are equal with settings in IP Webcam."
 fi
 
+# Test if audio server is running on pipewire
+if pactl info | grep -q PipeWire; then
+    if [ "$CAPTURE_STREAM" = v ]; then
+        :
+    else
+    # currently setting audio sinks errors out, so give user a workaround
+        error "Only video streams on Pipewire are currently supported. Audio is a WIP. Please set CAPTURE_STREAM value to v."
+    fi
+fi
+
 if [ $CAPTURE_STREAM = a -o $CAPTURE_STREAM = av ]; then
     # idea: check if default-source is correct. If two copy of script are running,
     # then after ending first before second you will be set up with $SINK_NAME.monitor,
     # but not with your original defauld source.
     # The same issue if script was not end correctly, and you restart it.
-    DEFAULT_SINK=$(pacmd dump | grep set-default-sink | cut -f2 -d " ")
-    DEFAULT_SOURCE=$(pacmd dump | grep set-default-source | cut -f2 -d " ")
+    DEFAULT_SINK=$(pactl info | grep "Sink" | cut -f3 -d " ")
+    DEFAULT_SOURCE=$(pactl info | grep "Source" | cut -f3 -d " ")
 
     SINK_NAME="ipwebcam"
     SINK_ID=$(module_id_by_sinkname $SINK_NAME)
@@ -392,24 +573,33 @@ set +e
 #sudo v4l2loopback-ctl set-caps $GST_0_10_VIDEO_CAPS $DEVICE
 
 pipeline_video() {
-    GST_FLIP=""
-    if [ $FLIP_METHOD ]; then
-        GST_FLIP="! videoflip method=\"$FLIP_METHOD\" "
+    GST_FLIP="${FLIP_METHOD:+! videoflip method=$FLIP_METHOD}"
+    GST_CROP="${CROP_LEFT:+ left=$CROP_LEFT}${CROP_RIGHT:+ right=$CROP_RIGHT}${CROP_TOP:+ top=$CROP_TOP}${CROP_BOTTOM:+ bottom=$CROP_BOTTOM}"
+    GST_CROP="${GST_CROP:+! videocrop$GST_CROP}"
+    # Due to what seems an issue between v4l2loopback and gst-1.0 (https://github.com/umlaeute/v4l2loopback/issues/83),
+    # the pipeline might need the "tee" multiplexer to enforce an additional buffer copy.
+    # Here we enable it if the user explicitly asked to.
+    # TODO: consider automatically enabling this if using gst-1.0 and specific version ranges of v4l2loopback.
+    GST_TEE=""
+    if [ "$USE_TEE" = "true" ]; then
+        GST_TEE="! tee "
     fi
 
-    echo souphttpsrc location="$VIDEO_URL" do-timestamp=true is-live=true \
+    echo souphttpsrc location="$VIDEO_URL" do-timestamp=true is-live=true user-id="$USERNAME" user-pw="$PASSWORD" \
       ! queue \
-      ! multipartdemux \
+      ! multipartdemux ! "image/jpeg,framerate=$FPS" \
       ! decodebin \
-      $GST_FLIP \
       ! $GST_VIDEO_CONVERTER \
       ! videoscale \
       ! $GST_VIDEO_CAPS \
+      $GST_FLIP \
+      $GST_CROP \
+      $GST_TEE \
       ! v4l2sink device="$DEVICE" sync=$SYNC
 }
 
 pipeline_audio() {
-  echo souphttpsrc location="$AUDIO_URL" do-timestamp=true is-live=true \
+  echo souphttpsrc location="$AUDIO_URL" do-timestamp=true is-live=true user-id="$USERNAME" user-pw="$PASSWORD" \
     ! $GST_AUDIO_CAPS ! queue \
     ! pulsesink device="$SINK_NAME" sync=$SYNC
 }
@@ -431,30 +621,30 @@ if [ $DISABLE_PROXY = 1 ]; then
     unset http_proxy
 fi
 
-"$GSTLAUNCH" -e -vt --gst-plugin-spew \
-             --gst-debug="$GST_DEBUG" \
-    $PIPELINE \
-    >feed.log 2>&1 &
+stream_intro() {
+    if [ $CAPTURE_STREAM = av ]; then
+        MESSAGE="IP Webcam audio is streaming through pulseaudio sink '$SINK_NAME'.\nIP Webcam video is streaming through v4l2loopback device $DEVICE.\n"
+    elif [ $CAPTURE_STREAM = a ]; then
+        MESSAGE="IP Webcam audio is streaming through pulseaudio sink '$SINK_NAME'.\n"
+    elif [ $CAPTURE_STREAM = v ]; then
+        MESSAGE="IP Webcam video is streaming through v4l2loopback device $DEVICE.\n"
+    else
+        error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
+    fi
+    info "${MESSAGE}You can now open your videochat app."
+
+    echo "Press enter to end stream."
+}
+stream_failure() {
+    warning "Stream ended unexpectedly!"
+}
+
+JOB_NAME='stream' JOB_LOG=feed.log JOB_INTRO_CMD=stream_intro JOB_FAILURE_CMD=stream_failure \
+    monitor_job "$GSTLAUNCH" -e -vt --gst-plugin-spew --gst-debug="$GST_DEBUG" $PIPELINE
     # Maybe we need edit this pipeline to transfer it to "Monitor of IP Webcam" to be able to use it as a microphone?
 
-GSTLAUNCH_PID=$!
-
-if [ $CAPTURE_STREAM = av ]; then
-    MESSAGE="IP Webcam audio is streaming through pulseaudio sink '$SINK_NAME'.\nIP Webcam video is streaming through v4l2loopback device $DEVICE.\n"
-elif [ $CAPTURE_STREAM = a ]; then
-    MESSAGE="IP Webcam audio is streaming through pulseaudio sink '$SINK_NAME'.\n"
-elif [ $CAPTURE_STREAM = v ]; then
-    MESSAGE="IP Webcam video is streaming through v4l2loopback device $DEVICE.\n"
-else
-    error "Incorrect CAPTURE_STREAM value ($CAPTURE_STREAM). Should be a, v or av."
-fi
-info "${MESSAGE}You can now open your videochat app."
-
-echo "Press enter to end stream"
-read
-
-kill $GSTLAUNCH_PID > /dev/null 2>&1 || echo ""
-if [ $CAPTURE_STREAM = a -o $CAPTURE_STREAM = av ]; then
+# cleanup
+if [ $CAPTURE_STREAM = a ] || [ $CAPTURE_STREAM = av ]; then
     pactl set-default-source ${DEFAULT_SOURCE}
     pactl unload-module ${ECANCEL_ID}
     pactl unload-module ${SINK_ID}
@@ -464,4 +654,3 @@ fi
 if [ $MODE = adb ]; then "$ADB" $ADB_FLAGS forward --remove tcp:$PORT; fi
 
 echo "Disconnected from IP Webcam. Have a nice day!"
-# idea: capture ctrl-c signal and set default source back
