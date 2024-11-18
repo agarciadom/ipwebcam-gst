@@ -640,7 +640,7 @@ stream_failure() {
 }
 
 JOB_NAME='stream' JOB_LOG=feed.log JOB_INTRO_CMD=stream_intro JOB_FAILURE_CMD=stream_failure \
-    monitor_job "$GSTLAUNCH" -e -vt --gst-plugin-spew --gst-debug="$GST_DEBUG" $PIPELINE
+    monitor_job "$GSTLAUNCH" -e -vt --gst-debug="$GST_DEBUG" $PIPELINE
     # Maybe we need edit this pipeline to transfer it to "Monitor of IP Webcam" to be able to use it as a microphone?
 
 # cleanup
